@@ -1,0 +1,38 @@
+[package]
+name = "pantry"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.86"
+askama = "0.12.1"
+askama_axum = "0.4.0"
+async-io = "2.3.3"
+async-walkdir = "2.0.0"
+axum = "0.7.5"
+clap = { version = "4.5.7", features = ["derive", "env"] }
+comrak = "0.24.1"
+convert_case = "0.6.0"
+dirs = "5.0.1"
+macro_rules_attribute = "0.2.0"
+mime_guess = "2.0.4"
+notify = "6.1.1"
+rust-embed = { version = "8.4.0", features = ["interpolate-folder-path"] }
+scraper = "0.19.0"
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = "1.0.120"
+slug = "0.1.5"
+smol = "2.0.0"
+smol-axum = { version = "0.1.0", features = ["async-net"] }
+smol-macros = "0.1.1"
+thiserror = "1.0.61"
+url = { version = "2.5.2", features = ["serde"] }
+walkdir = "2.5.0"
+xapian-rs = { version = "0.1.0", path = "../xapian-rs" }
+yaml-front-matter = "0.1.0"
+
+[build-dependencies]
+anyhow = "1.0.86"
+macro_rules_attribute = "0.2.0"
+smol = "2.0.0"
+smol-macros = "0.1.1"

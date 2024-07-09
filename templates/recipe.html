@@ -1,0 +1,8 @@
+{% extends "_layout.html" %}
+{% block content -%}
+<article class="recipe">
+  <header>
+    <h2 id="title">{{ title }}</h2>
+  </header>
+  {{ recipe.contents()|safe }}
+{%- endblock content -%}

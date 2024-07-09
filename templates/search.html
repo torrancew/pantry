@@ -1,0 +1,70 @@
+{% extends "_layout.html" %}
+{% block content -%}
+{%- let search_field_value -%}
+{%- if let Some(query) = query -%}
+  {%- let search_field_value = query.clone() -%}
+{%- else -%}
+{%- let search_field_value = String::default() -%}
+{%- endif -%}
+<form action="/search" method="GET">
+  <input type="search" name="query" placeholder="Search Query" aria-label="Search Query" autofocus value="{{ search_field_value }}"/>
+  <input type="submit" hidden/>
+</form>
+<hr />
+<div class="sidebar">
+  {%- if self.is_filterable() -%}
+  <b>Filters</b>
+  <hr/>
+  {%- endif -%}
+  {%- if self.has_many_categories() -%}
+  <details>
+    <summary>Category</summary>
+    {%- for (category, count) in categories -%}
+    {%- let new_query = format!("category:{} {}", category.to_lowercase(), search_field_value) -%}
+    <a href="/search?query={{ new_query }}">{{ category }} ({{ count }})</a><br/>
+    {%- endfor -%}
+  </details>
+  {%- endif -%}
+</div>
+<figure class="content">
+  <table id="results" class="striped">
+    <thead>
+      <tr class="heading">
+        <th scope="col">Name</th>
+        <th scope="col">Source</th>
+        <th scope="col">Category</th>
+        <th scope="col">Tags</th>
+      </tr>
+    </thead>
+    <tbody>
+      {%- for recipe in recipes -%}
+      <tr class="recipe">
+        <th scope="row"><a href="/recipe/{{ recipe.metadata().unwrap().id() }}">{{ recipe.title().unwrap_or("Unknown") }}</a></th>
+        <td>
+        {%- if let Some(src) = recipe.sources().first() -%}
+          <a href="{{ src.url() }}" target="_blank">{{ src.name() }}</a>
+        {%- else -%}
+          {{ PLACEHOLDER }}
+        {%- endif -%}
+        <td>
+          {%- if let Some(category) = recipe.category() -%}
+          <a href="/search?query=category:{{ category.to_lowercase() }}">{{ category }}</a>
+          {%- else -%}
+          {{ PLACEHOLDER }}
+          {%- endif -%}
+        </td>
+        <td>
+        {%- if recipe.tags().is_empty() -%}
+          {{ PLACEHOLDER }}
+        {%- else -%}
+          {%- for tag in recipe.tags() -%}
+          <span class="tag"><a href="/search?query=tag:{{ tag.to_lowercase() }}">{{ tag }}</a></span>
+          {%- endfor -%}
+        {%- endif -%}
+        </td>
+      </tr>
+      {%- endfor -%}
+    </tbody>
+  </table>
+</figure>
+{%- endblock content -%}

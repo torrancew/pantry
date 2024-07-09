@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <link rel="stylesheet" href="/assets/styles.css">
+    <title>Pantry</title>
+  </head>
+  <body>
+    <header class="container">
+      <nav>
+        <ul>
+          <li><a href="/">Browse</a></li>
+          <li><a href="/search">Search</a></li>
+        </ul>
+        <ul>
+          <li><details class="dropdown secondary">
+              <summary>Theme</summary>
+              <ul>
+                <li><a href="#" data-theme-switcher="auto">Auto</a></li>
+                <li><a href="#" data-theme-switcher="dark">Dark</a></li>
+                <li><a href="#" data-theme-switcher="light">Light</a></li>
+          </details></li>
+        </ul>
+      </nav>
+    </header>
+    <main class="container">
+      {% block content %}{% endblock %}
+    </main>
+    <footer class="container">
+      <nav>
+        <ul>
+          <li>Pantry</li>
+        </ul>
+        <ul>
+          <li>The lightweight, open-source kitchen manager</li>
+        </ul>
+      </nav>
+    </footer>
+    <script src="/assets/screen-wake.js"></script>
+    <script src="/assets/theme-switcher.js"></script>
+  </body>
+</html>
