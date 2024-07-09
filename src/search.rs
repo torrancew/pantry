@@ -69,10 +69,6 @@ impl AsyncIndex {
             _ => Err(Error::InvalidResponse(response)),
         }
     }
-
-    pub async fn quit(self) -> Result<(), Error> {
-        Ok(self.tx.send(Request::Quit).await?)
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -123,7 +119,6 @@ pub enum Error {
 
 pub struct Indexer {
     db: xapian::WritableDatabase,
-    stemmer: xapian::Stem,
     term_generator: xapian::TermGenerator,
     recipe_dir: PathBuf,
     searcher: Searcher,
@@ -149,7 +144,6 @@ impl Indexer {
 
         Self {
             db,
-            stemmer,
             term_generator,
             requests,
             recipe_dir,
@@ -237,9 +231,6 @@ impl Indexer {
                         .collect(),
                 })
             }
-            &Quit => {
-                todo!()
-            }
         }
     }
 
@@ -261,7 +252,6 @@ pub enum Request {
         size: u32,
         start: u32,
     },
-    Quit,
 }
 
 #[derive(Clone, Debug)]
@@ -271,7 +261,6 @@ pub enum Response {
         categories: BTreeMap<String, usize>,
         recipes: Vec<crate::recipe::Recipe>,
     },
-    Quit,
 }
 
 pub struct Searcher {
