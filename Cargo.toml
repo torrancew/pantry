@@ -12,7 +12,6 @@ async-walkdir = "2.0.0"
 axum = "0.7.5"
 clap = { version = "4.5.7", features = ["derive", "env"] }
 comrak = "0.24.1"
-convert_case = "0.6.0"
 dirs = "5.0.1"
 macro_rules_attribute = "0.2.0"
 mime_guess = "2.0.4"
