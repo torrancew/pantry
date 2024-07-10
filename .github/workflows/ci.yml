@@ -21,20 +21,17 @@ jobs:
         arch:
           - aarch64
           - x86_64
-    env:
-      TARGET: ${{ matrix.arch }}-unknown-linux-musl
     steps:
     - uses: actions/checkout@v3
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
         override: true
-        target: ${{ env.TARGET }}
         toolchain: stable
         components: clippy
     - uses: actions/cache@v3
       with:
-        key: ${{ env.TARGET }}-cargo-${{ hashFiles('**/Cargo.lock') }}-ci
+        key: cargo-${{ hashFiles('**/Cargo.lock') }}-ci
         path: |
           ~/.cargo/bin/
           ~/.cargo/registry/index/
@@ -43,13 +40,9 @@ jobs:
           target/
     - uses: actions-rs/cargo@v1
       with:
-        use-cross: true
         command: test
-        args: --target ${{ env.TARGET }}
         toolchain: stable
     - uses: actions-rs/cargo@v1
       with:
-        use-cross: true
         command: clippy
-        args: --target ${{ env.TARGET }}
         toolchain: stable

@@ -26,7 +26,6 @@ jobs:
           - x86_64
     env:
       CARGO_TERM_COLOR: always
-      TARGET: ${{ matrix.arch }}-unknown-linux-musl
     steps:
     - uses: actions/checkout@v3
     - name: Install QEMU
@@ -38,12 +37,11 @@ jobs:
       with:
         profile: minimal
         override: true
-        target: ${{ env.TARGET }}
         toolchain: stable
     - name: Cache Build Artifacts
       uses: actions/cache@v3
       with:
-        key: ${{ env.TARGET }}-cargo-${{ hashFiles('**/Cargo.lock') }}-release
+        key: cargo-${{ hashFiles('**/Cargo.lock') }}-release
         path: |
           ~/.cargo/bin/
           ~/.cargo/registry/index/
@@ -53,15 +51,14 @@ jobs:
     - name: Compile
       uses: actions-rs/cargo@v1
       with:
-        use-cross: true
         command: build
-        args: --release --target ${{ env.TARGET }}
+        args: --release
         toolchain: stable
     - name: Upload Binaries
       uses: actions/upload-artifact@v3
       with:
         name: rtsp2mjpg.${{ matrix.arch }}
-        path: target/${{ env.TARGET }}/release/rtsp2mjpg
+        path: target/release/rtsp2mjpg
 
   container_images:
     name: Build Container Images
