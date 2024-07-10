@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         arch:
@@ -24,7 +24,7 @@ jobs:
     steps:
     - name: Install Xapian dependencies
       run: |
-        sudo apt-get update && sudo apt-get install -y libxapian-dev
+        sudo apt-get update && sudo apt-get install -y libxapian-dev sassc node-typescript
     - uses: actions/checkout@v3
     - uses: actions-rs/toolchain@v1
       with:
