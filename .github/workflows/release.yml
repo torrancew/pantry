@@ -57,8 +57,8 @@ jobs:
     - name: Upload Binaries
       uses: actions/upload-artifact@v3
       with:
-        name: rtsp2mjpg.${{ matrix.arch }}
-        path: target/release/rtsp2mjpg
+        name: pantry.${{ matrix.arch }}
+        path: target/release/pantry
 
   container_images:
     name: Build Container Images
