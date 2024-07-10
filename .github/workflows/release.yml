@@ -16,50 +16,6 @@ env:
   REGISTRY_PASSWORD: ${{ github.token }}
 
 jobs:
-  static_binaries:
-    name: Build Static Executables
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch:
-          - aarch64
-          - x86_64
-    env:
-      CARGO_TERM_COLOR: always
-    steps:
-    - uses: actions/checkout@v3
-    - name: Install QEMU
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y qemu-user-static
-    - name: Install Rust Toolchain
-      uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        override: true
-        toolchain: stable
-    - name: Cache Build Artifacts
-      uses: actions/cache@v3
-      with:
-        key: cargo-${{ hashFiles('**/Cargo.lock') }}-release
-        path: |
-          ~/.cargo/bin/
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-          target/
-    - name: Compile
-      uses: actions-rs/cargo@v1
-      with:
-        command: build
-        args: --release
-        toolchain: stable
-    - name: Upload Binaries
-      uses: actions/upload-artifact@v3
-      with:
-        name: pantry.${{ matrix.arch }}
-        path: target/release/pantry
-
   container_images:
     name: Build Container Images
     strategy:
