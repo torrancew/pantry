@@ -25,7 +25,7 @@
   {%- for recipe in recipes.iter() -%}
     {%- if let Some(metadata) = recipe.metadata() -%}
       <tr class="recipe">
-        <th scope="row" class="title"><a href="/recipe/{{ metadata.id() }}">{{ metadata.title() }}</a></th>
+        <th scope="row" class="title"><a href="/recipe/{{ metadata.slug() }}">{{ metadata.title() }}</a></th>
         <td class="source">
       {%- if let Some(source) = metadata.sources().first() -%}
           <a href="{{ source.url() }}">{{ source.name() }}</a>

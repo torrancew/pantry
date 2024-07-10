@@ -74,6 +74,7 @@ pub struct Search<'s> {
     query: Option<String>,
     categories: BTreeMap<String, usize>,
     recipes: Vec<crate::recipe::Recipe>,
+    tags: BTreeMap<String, usize>,
 }
 
 impl Search<'_> {
@@ -81,12 +82,14 @@ impl Search<'_> {
         query: impl Into<Option<String>>,
         recipes: impl IntoIterator<Item = crate::recipe::Recipe>,
         categories: impl IntoIterator<Item = (String, usize)>,
+        tags: impl IntoIterator<Item = (String, usize)>,
     ) -> Self {
         Self {
             parent: &LAYOUT,
             query: query.into(),
-            categories: categories.into_iter().collect(),
+            categories: BTreeMap::from_iter(categories),
             recipes: Vec::from_iter(recipes),
+            tags: BTreeMap::from_iter(tags),
         }
     }
 
@@ -94,8 +97,12 @@ impl Search<'_> {
         self.categories.keys().len() > 1
     }
 
+    pub fn has_many_tags(&self) -> bool {
+        self.tags.keys().len() > 1
+    }
+
     pub fn is_filterable(&self) -> bool {
-        self.has_many_categories()
+        self.has_many_categories() || self.has_many_tags()
     }
 }
 
@@ -106,6 +113,7 @@ impl Default for Search<'static> {
             query: None,
             categories: Default::default(),
             recipes: Default::default(),
+            tags: Default::default(),
         }
     }
 }

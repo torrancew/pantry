@@ -27,7 +27,7 @@ smol-macros = "0.1.1"
 thiserror = "1.0.61"
 url = { version = "2.5.2", features = ["serde"] }
 walkdir = "2.5.0"
-xapian-rs = { version = "0.1.0", path = "../xapian-rs" }
+xapian-rs = "0.1.0"
 yaml-front-matter = "0.1.0"
 
 [build-dependencies]

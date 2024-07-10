@@ -17,8 +17,10 @@ async fn main(_ex: Arc<Executor<'_>>) -> Result<(), Box<dyn std::error::Error>> 
     println!("cargo::rerun-if-changed=ts/theme-switcher.ts");
 
     let asset_dir = env::var("OUT_DIR").map(PathBuf::from)?.join("assets");
+    eprintln!("asset_dir={asset_dir:?}");
     smol::fs::create_dir_all(&asset_dir).await?;
 
+    eprintln!("Compiling SASS");
     let sassc = Command::new("sassc")
         .arg("--sass")
         .arg("sass/styles.sass")
@@ -32,6 +34,7 @@ async fn main(_ex: Arc<Executor<'_>>) -> Result<(), Box<dyn std::error::Error>> 
         std::process::exit(sassc.status.code().unwrap())
     }
 
+    eprintln!("Compiling typescript");
     let tsc = Command::new("tsc")
         .args([
             "--outDir",

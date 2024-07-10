@@ -1,0 +1,152 @@
+name: Release Artifacts
+
+on:
+  push:
+    branches: [ "develop", "main" ]
+    tags: [ "v*" ]
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
+  REGISTRY_USERNAME: ${{ github.actor }}
+  REGISTRY_PASSWORD: ${{ github.token }}
+
+jobs:
+  static_binaries:
+    name: Build Static Executables
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch:
+          - aarch64
+          - x86_64
+    env:
+      CARGO_TERM_COLOR: always
+      TARGET: ${{ matrix.arch }}-unknown-linux-musl
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install QEMU
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y qemu-user-static
+    - name: Install Rust Toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        override: true
+        target: ${{ env.TARGET }}
+        toolchain: stable
+    - name: Cache Build Artifacts
+      uses: actions/cache@v3
+      with:
+        key: ${{ env.TARGET }}-cargo-${{ hashFiles('**/Cargo.lock') }}-release
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+    - name: Compile
+      uses: actions-rs/cargo@v1
+      with:
+        use-cross: true
+        command: build
+        args: --release --target ${{ env.TARGET }}
+        toolchain: stable
+    - name: Upload Binaries
+      uses: actions/upload-artifact@v3
+      with:
+        name: rtsp2mjpg.${{ matrix.arch }}
+        path: target/${{ env.TARGET }}/release/rtsp2mjpg
+
+  container_images:
+    name: Build Container Images
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+        runner: [self-hosted, ubuntu-latest]
+        exclude:
+        - arch: amd64
+          runner: self-hosted
+        - arch: arm64
+          runner: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
+    steps:
+    - uses: actions/checkout@v3
+    - id: metadata
+      name: Configure Container Metadata
+      uses: docker/metadata-action@v4
+      with:
+        flavor:
+          suffix=-${{ matrix.arch }}
+        images: |
+          ghcr.io/${{ env.IMAGE_NAME }}
+        tags: |
+          type=sha
+          type=ref,event=branch
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major.minor}}
+          type=semver,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') }}
+    - name: Build Container
+      id: build_image
+      uses: redhat-actions/buildah-build@v2
+      with:
+        tags: ${{ steps.metadata.outputs.tags }}
+        labels: ${{ steps.metadata.outputs.labels }}
+        platforms: linux/${{ matrix.arch }}
+        extra-args: |
+          --isolation=chroot
+        containerfiles: |
+          ./Containerfile
+    - name: Push to Registry
+      uses: redhat-actions/push-to-registry@v2
+      with:
+        image: ${{ steps.build_image.outputs.image }}
+        tags: ${{ steps.build_image.outputs.tags }}
+        registry: ${{ env.IMAGE_REGISTRY }}
+        username: ${{ env.REGISTRY_USERNAME }}
+        password: ${{ env.REGISTRY_PASSWORD }}
+
+  multiarch_image:
+    name: Multi-Arch Container Image
+    needs: container_images
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install Buildah and Podman
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y buildah podman
+    - id: metadata
+      name: Configure Container Metadata
+      uses: docker/metadata-action@v4
+      with:
+        images: |
+          ghcr.io/${{ env.IMAGE_NAME }}
+        tags: |
+          type=sha
+          type=ref,event=branch
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major.minor}}
+          type=semver,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') }}
+    - name: Tag Container
+      env:
+        IMAGE_ID: ${{ fromJSON(steps.metadata.outputs.json).tags[0] }}
+        ALL_TAGS: ${{ join(fromJSON(steps.metadata.outputs.json).tags, ' ')}}
+      run: |
+        buildah manifest create ${{ env.IMAGE_NAME }}
+        buildah manifest add ${{ env.IMAGE_NAME }} ${{ env.IMAGE_ID }}-amd64
+        buildah manifest add ${{ env.IMAGE_NAME }} ${{ env.IMAGE_ID }}-arm64
+        buildah tag ${{ env.IMAGE_NAME }} ${{ env.ALL_TAGS }}
+    - name: Push to Registry
+      uses: redhat-actions/push-to-registry@v2
+      with:
+        image: ${{ env.IMAGE_NAME }}
+        tags: ${{ steps.metadata.outputs.tags }}
+        registry: ${{ env.IMAGE_REGISTRY }}
+        username: ${{ env.REGISTRY_USERNAME }}
+        password: ${{ env.REGISTRY_PASSWORD }}
+

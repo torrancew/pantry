@@ -48,7 +48,7 @@ impl MetaData {
         &self.category
     }
 
-    pub fn id(&self) -> String {
+    pub fn slug(&self) -> String {
         slug::slugify(self.title())
     }
 
@@ -74,10 +74,6 @@ pub struct Recipe {
 impl Recipe {
     pub fn contents(&self) -> &str {
         &self.contents
-    }
-
-    pub fn docid(&self) -> u32 {
-        todo!()
     }
 
     pub async fn from_async_reader(r: impl AsyncRead) -> io::Result<Self> {

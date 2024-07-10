@@ -73,7 +73,14 @@ impl AppState {
         query: impl AsRef<str>,
         start: impl Into<Option<u32>>,
         size: impl Into<Option<u32>>,
-    ) -> Result<(BTreeMap<String, usize>, Vec<crate::recipe::Recipe>), crate::search::Error> {
+    ) -> Result<
+        (
+            BTreeMap<String, usize>,
+            Vec<crate::recipe::Recipe>,
+            BTreeMap<String, usize>,
+        ),
+        crate::search::Error,
+    > {
         self.xapian
             .query(
                 query.as_ref(),
@@ -88,7 +95,6 @@ impl AppState {
     }
 
     pub async fn reload(&self) {
-        eprintln!("Reloading recipes from disk!");
         let mut recipes = BTreeMap::default();
         let mut recipe_loader =
             Box::pin(crate::recipe::Recipe::load_all_async(&self.recipe_dir).await);
@@ -102,7 +108,6 @@ impl AppState {
         let mut map = self.recipe_map.lock().await;
         *map = recipes;
 
-        eprintln!("Reindexing recipes");
         let _ = self.xapian.reindex().await;
     }
 }
@@ -149,8 +154,8 @@ async fn search(
     State(state): State<AppState>,
 ) -> Result<templates::Search<'static>> {
     if let Some(Query(SearchParams { query, start, size })) = params {
-        let (categories, recipes) = state.query(&query, start, size).await?;
-        Ok(templates::Search::new(query, recipes, categories))
+        let (categories, recipes, tags) = state.query(&query, start, size).await?;
+        Ok(templates::Search::new(query, recipes, categories, tags))
     } else {
         Ok(templates::Search::default())
     }

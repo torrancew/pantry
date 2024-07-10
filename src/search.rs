@@ -50,7 +50,14 @@ impl AsyncIndex {
         query: &str,
         start: u32,
         size: u32,
-    ) -> Result<(BTreeMap<String, usize>, Vec<crate::recipe::Recipe>), Error> {
+    ) -> Result<
+        (
+            BTreeMap<String, usize>,
+            Vec<crate::recipe::Recipe>,
+            BTreeMap<String, usize>,
+        ),
+        Error,
+    > {
         self.tx
             .send(Request::Search {
                 query: String::from(query),
@@ -65,44 +72,72 @@ impl AsyncIndex {
             Response::Search {
                 categories,
                 recipes,
-            } => Ok((categories, recipes)),
+                tags,
+            } => Ok((categories, recipes, tags)),
             _ => Err(Error::InvalidResponse(response)),
         }
     }
 }
 
-#[derive(Clone, Debug)]
-struct Faceter {
-    slot: xapian::Slot,
-    map: Arc<RwLock<BTreeMap<String, usize>>>,
-}
+#[derive(Clone, Debug, Default)]
+struct Categorizer(Arc<RwLock<BTreeMap<String, usize>>>);
 
-impl Faceter {
-    pub fn new(slot: impl Into<xapian::Slot>) -> Self {
-        Self {
-            slot: slot.into(),
-            map: Default::default(),
-        }
+impl Categorizer {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn facets(&self) -> BTreeMap<String, usize> {
-        self.map.read().unwrap().clone()
+        self.0.read().unwrap().clone()
     }
 
     pub fn reset(&self) {
-        self.map.write().unwrap().clear()
+        self.0.write().unwrap().clear()
     }
 }
 
-impl xapian::MatchSpy for Faceter {
+impl xapian::MatchSpy for Categorizer {
     fn observe(&self, doc: &xapian::Document, _weight: f64) {
-        if let Some(Ok(category)) = doc.value(self.slot) {
-            self.map
+        if let Some(Ok(category)) = doc.value(1) {
+            self.0
                 .write()
                 .unwrap()
                 .entry(category)
                 .and_modify(|count| *count += 1)
                 .or_insert(1);
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+struct Tagger(Arc<RwLock<BTreeMap<String, usize>>>);
+
+impl Tagger {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn facets(&self) -> BTreeMap<String, usize> {
+        self.0.read().unwrap().clone()
+    }
+
+    pub fn reset(&self) {
+        self.0.write().unwrap().clear()
+    }
+}
+
+impl xapian::MatchSpy for Tagger {
+    fn observe(&self, doc: &xapian::Document, _weight: f64) {
+        if let Some(Ok(value)) = doc.value::<String>(2) {
+            let tags = value.split(',').collect::<Vec<_>>();
+            for tag in tags {
+                self.0
+                    .write()
+                    .unwrap()
+                    .entry(String::from(tag))
+                    .and_modify(|count| *count += 1)
+                    .or_insert(1);
+            }
         }
     }
 }
@@ -157,7 +192,8 @@ impl Indexer {
         self.term_generator.set_document(&doc);
         doc.set_data(serde_json::to_string(recipe).unwrap());
 
-        doc.add_term(format!("I:{}", id.as_ref().to_string_lossy()), None);
+        let idterm = format!("I:{}", id.as_ref().to_string_lossy());
+        doc.add_term(&idterm, None);
 
         if let Some(title) = recipe.metadata().map(|md| md.title()) {
             self.term_generator.index_text(title, None, "");
@@ -184,6 +220,8 @@ impl Indexer {
         }
 
         if let Some(tags) = recipe.metadata().map(|md| md.tags()) {
+            let tag_value = Vec::from_iter(tags.clone()).join(",");
+            doc.set_value(2, tag_value);
             for tag in tags {
                 self.term_generator.index_text(tag, None, "XT:");
                 self.term_generator.increase_termpos(None);
@@ -204,7 +242,7 @@ impl Indexer {
             self.term_generator.increase_termpos(None);
         }
 
-        self.db.add_document(doc);
+        self.db.replace_document_by_term(&idterm, doc);
     }
 
     fn handle_request(&mut self, req: &Request) -> Result<Response, Error> {
@@ -213,7 +251,6 @@ impl Indexer {
         match req {
             &Reindex => {
                 for (path, recipe) in Recipe::load_all(&recipe_dir) {
-                    eprintln!("Indexing {path:?}");
                     self.index_recipe(path, &recipe);
                 }
                 Ok(Response::Reindex)
@@ -229,6 +266,7 @@ impl Indexer {
                             serde_json::from_slice(&doc.data()).unwrap()
                         })
                         .collect(),
+                    tags: self.searcher.tags().collect(),
                 })
             }
         }
@@ -260,6 +298,7 @@ pub enum Response {
     Search {
         categories: BTreeMap<String, usize>,
         recipes: Vec<crate::recipe::Recipe>,
+        tags: BTreeMap<String, usize>,
     },
 }
 
@@ -267,14 +306,17 @@ pub struct Searcher {
     db: xapian::Database,
     enquire: xapian::Enquire,
     query_parser: xapian::QueryParser,
-    categorizer: Faceter,
+    categorizer: Categorizer,
+    tagger: Tagger,
 }
 
 impl Searcher {
     pub fn new(db: xapian::Database, stemmer: &xapian::Stem) -> Self {
-        let categorizer = Faceter::new(1);
+        let categorizer = Categorizer::new();
+        let tagger = Tagger::new();
         let mut enquire = xapian::Enquire::new(&db);
         enquire.add_matchspy(&categorizer);
+        enquire.add_matchspy(&tagger);
 
         let mut query_parser = xapian::QueryParser::default();
         query_parser.set_stemmer(stemmer);
@@ -298,6 +340,7 @@ impl Searcher {
         Searcher {
             db,
             categorizer,
+            tagger,
             enquire,
             query_parser,
         }
@@ -307,8 +350,13 @@ impl Searcher {
         self.categorizer.facets().into_iter()
     }
 
+    pub fn tags(&self) -> impl Iterator<Item = (String, usize)> {
+        self.tagger.facets().into_iter()
+    }
+
     fn search(&mut self, query: impl AsRef<str>, start: u32, size: u32) -> xapian::MSet {
         self.categorizer.reset();
+        self.tagger.reset();
         let query = self.query_parser.parse_query(query, None, "");
         self.enquire.set_query(query, None);
         self.enquire

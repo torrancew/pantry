@@ -1,21 +1,17 @@
-FROM lukemathwalker/cargo-chef:latest-rust-1 AS chef
-WORKDIR /app
+FROM docker.io/library/rust:1-slim-bookworm as builder
 
-FROM chef AS planner
+RUN apt-get update && apt-get install -y build-essential gcc g++ clang-16 libc++1-16 libclang1-16 libxapian-dev npm sassc && apt-get clean -y
+RUN npm install -g typescript
+WORKDIR /usr/src/pantry
 COPY . .
-RUN cargo chef prepare --recipe-path recipe.json
+RUN env cargo install --path .
 
-FROM chef AS builder
-COPY --from=planner /app/recipe.json recipe.json
-# Build dependencies - this is the caching Docker layer!
-RUN cargo chef cook --release --recipe-path recipe.json
-# Build application
-COPY . .
-RUN cargo build --release --bin pantry
+FROM docker.io/library/debian:bookworm-slim
+RUN mkdir /recipes
+RUN apt-get update && apt-get install -y libxapian30 && apt-get clean -y
+COPY --from=builder /usr/local/cargo/bin/pantry /usr/local/bin/pantry
 
-# We do not need the Rust toolchain to run the binary!
-FROM debian:bookworm-slim AS runtime
-WORKDIR /app
-COPY --from=builder /app/target/release/pantry /usr/local/bin
-VOLUME /recipes
+EXPOSE 3000
+
 ENTRYPOINT ["/usr/local/bin/pantry"]
+CMD ["--listen-on", "$PANTRY_ADDRESS", "--recipe-dir", "/recipes"]
