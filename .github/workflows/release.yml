@@ -62,7 +62,7 @@ jobs:
     - name: Log in to Registry
       uses: redhat-actions/podman-login@v1
       with:
-        username: ${{ env.REGISTRY_USER }}
+        username: ${{ env.REGISTRY_USERNAME }}
         password: ${{ env.REGISTRY_PASSWORD }}
         registry: ${{ env.IMAGE_REGISTRY }}
     - name: Push to Registry (arm64)
