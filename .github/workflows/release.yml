@@ -46,7 +46,7 @@ jobs:
           type=semver,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') }}
     - name: Install OverlayFS
       run: |
-        apt-get install -y fuse-overlayfs
+        sudo apt-get install -y fuse-overlayfs
     - name: Build Container
       id: build_image
       uses: redhat-actions/buildah-build@v2
