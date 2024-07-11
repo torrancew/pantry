@@ -6,7 +6,7 @@ use mime_guess::Mime;
 use rust_embed::{Embed, EmbeddedFile};
 
 #[derive(Embed)]
-#[folder = "$OUT_DIR/assets/"]
+#[folder = "assets/"]
 struct Asset;
 
 pub struct StaticFile {

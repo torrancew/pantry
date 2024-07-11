@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light dark">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
-    <link rel="stylesheet" href="/assets/styles.css">
+    <link rel="stylesheet" href="/assets/css/styles.css">
     <title>Pantry</title>
   </head>
   <body>
@@ -39,7 +39,7 @@
         </ul>
       </nav>
     </footer>
-    <script src="/assets/screen-wake.js"></script>
-    <script src="/assets/theme-switcher.js"></script>
+    {% block scripts %}{% endblock %}
+    <script src="/assets/js/theme-switcher.js"></script>
   </body>
 </html>

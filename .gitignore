@@ -1,3 +1,5 @@
+!.gitkeep
 fly.toml
 /data
 /target
+/vendor
