@@ -29,7 +29,7 @@ jobs:
           runner: ubuntu-latest
     runs-on: ${{ matrix.runner }}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - id: metadata
       name: Configure Container Metadata
       uses: docker/metadata-action@v4
@@ -47,7 +47,7 @@ jobs:
     - name: Install OverlayFS
       if: ${{ matrix.arch == 'arm64' }}
       run: |
-        apt-get install -y fuse-overlayfs
+        apt-get install -y fuse-overlayfs skopeo
     - name: Build Container
       id: build_image
       uses: redhat-actions/buildah-build@v2
@@ -59,14 +59,25 @@ jobs:
           --isolation=chroot
         containerfiles: |
           ./Containerfile
-    - name: Push to Registry
+    - name: Log in to Registry
+      uses: redhat-actions/podman-login@v1
+      with:
+        username: ${{ env.REGISTRY_USER }}
+        password: ${{ env.REGISTRY_PASSWORD }}
+        registry: ${{ env.IMAGE_REGISTRY }}
+    - name: Push to Registry (arm64)
+      if: ${{ matrix.arch == 'arm64' }}
+      run: |
+        skopeo copy containers-storage:${{ steps.build_image.outputs.image-with-tag }} ${{ env.IMAGE_REGISTRY }}/${{ steps.build_image.outputs.image-with-tag }}
+    - name: Push to Registry (amd64)
+      if: ${{ matrix.arch != 'arm64' }}
       uses: redhat-actions/push-to-registry@v2
       with:
         image: ${{ steps.build_image.outputs.image }}
         tags: ${{ steps.build_image.outputs.tags }}
         registry: ${{ env.IMAGE_REGISTRY }}
-        username: ${{ env.REGISTRY_USERNAME }}
-        password: ${{ env.REGISTRY_PASSWORD }}
+        extra-args: |
+          --storage fuse-overlayfs
 
   multiarch_image:
     name: Multi-Arch Container Image
@@ -74,7 +85,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Install Buildah and Podman
-      if: 
       run: |
         sudo apt-get update
         sudo apt-get install -y buildah podman
@@ -88,8 +98,8 @@ jobs:
           type=sha
           type=ref,event=branch
           type=semver,pattern={{version}}
-          type=semver,pattern={{major.minor}}
-          type=semver,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') }}
+          type=semver,pattern={{major.minor}},priority=850
+          type=semver,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') }},825
     - name: Tag Container
       env:
         IMAGE_ID: ${{ fromJSON(steps.metadata.outputs.json).tags[0] }}
