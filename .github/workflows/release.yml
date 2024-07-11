@@ -76,8 +76,6 @@ jobs:
         image: ${{ steps.build_image.outputs.image }}
         tags: ${{ steps.build_image.outputs.tags }}
         registry: ${{ env.IMAGE_REGISTRY }}
-        extra-args: |
-          --storage fuse-overlayfs
 
   multiarch_image:
     name: Multi-Arch Container Image
