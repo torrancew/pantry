@@ -1,5 +1,19 @@
-li::marker {
-  content: '•';
+ul li {
+  list-style-type: circle;
+}
+
+ul li.checked {
+  font-style: italic;
+  list-style-type: "✔";
+  text-decoration: line-through;
+}
+
+details summary::after {
+  display: inline-block;
+}
+
+h2.collapsed,h3.collapsed {
+  display: none;
 }
 
 summary span.category, tr.recipe th.title {
@@ -11,12 +25,23 @@ tr.recipe td.source {
   font-weight: lighter;
 }
 
-div.grid {
+div.metadata, div.grid {
   display: grid;
-  grid-template-columns: minmax(auto, 25%) minmax(auto, 25%) minmax(auto, 25%) minmax(auto, 25%);
+
+  @media (min-width: 576px) {
+    grid-template-columns: 1fr;
+  }
+
+  @media (min-width: 768px) {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  @media (min-width: 1024px) {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
 }
 
-details.filter span a:link, table a:link {
+details.filters span a:link, table a:link {
   text-decoration: none;
 }
 

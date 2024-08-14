@@ -175,7 +175,7 @@ impl Indexer {
 
         term_generator.set_database(&db);
         term_generator.set_stemmer(&stemmer);
-        term_generator.set_stemming_strategy(xapian::StemStrategy::Some);
+        term_generator.set_stemming_strategy(xapian::StemStrategy::All);
 
         Self {
             db,
@@ -192,8 +192,14 @@ impl Indexer {
         self.term_generator.set_document(&doc);
         doc.set_data(serde_json::to_string(recipe).unwrap());
 
-        let idterm = format!("I:{}", id.as_ref().to_string_lossy());
-        doc.add_term(&idterm, None);
+        let id = id.as_ref().to_string_lossy();
+        let idterm = format!("I:{id}");
+        doc.add_boolean_term(&idterm);
+
+        if let Some(slug) = recipe.metadata().map(|md| md.slug()) {
+            let slugterm = format!("Q:{slug}");
+            doc.add_boolean_term(&slugterm)
+        }
 
         if let Some(title) = recipe.metadata().map(|md| md.title()) {
             self.term_generator.index_text(title, None, "");
@@ -243,6 +249,14 @@ impl Indexer {
         }
 
         self.db.replace_document_by_term(&idterm, doc);
+    }
+
+    #[allow(dead_code, unused_variables)]
+    fn remove_recipe(&mut self, path: impl AsRef<Path>) {
+        let id = path.as_ref().to_string_lossy();
+        let idterm = format!("I:{id}");
+        //self.db.delete_document_by_term(idterm)
+        todo!()
     }
 
     fn handle_request(&mut self, req: &Request) -> Result<Response, Error> {
@@ -320,7 +334,7 @@ impl Searcher {
 
         let mut query_parser = xapian::QueryParser::default();
         query_parser.set_stemmer(stemmer);
-        query_parser.set_stemming_strategy(StemStrategy::Some);
+        query_parser.set_stemming_strategy(StemStrategy::All);
 
         query_parser.add_prefix("desc", "D:");
         query_parser.add_prefix("description", "D:");
@@ -333,9 +347,10 @@ impl Searcher {
         query_parser.add_prefix("name", "S:");
         query_parser.add_prefix("title", "S:");
         query_parser.add_prefix("source", "XS:");
-        query_parser.add_boolean_prefix::<_, &str>("category", "XC:", None);
+        query_parser.add_prefix("category", "XC:");
+        query_parser.add_prefix("tag", "XT:");
+        query_parser.add_boolean_prefix::<_, &str>("slug", "Q:", None);
         query_parser.add_boolean_prefix::<_, &str>("site", "XD:", None);
-        query_parser.add_boolean_prefix::<_, &str>("tag", "XT:", "");
 
         Searcher {
             db,

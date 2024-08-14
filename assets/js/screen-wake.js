@@ -17,4 +17,4 @@ async function handleVisibilityChange() {
 document.addEventListener("DOMContentLoaded", requestWakeLock);
 document.addEventListener("visibilityChange", handleVisibilityChange);
 
-// vim: set ts=4 sts=4 sw=4 et
+// vim: set ts=4 sts=4 sw=4 et:

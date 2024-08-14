@@ -90,8 +90,12 @@ impl AppState {
             .await
     }
 
-    pub async fn recipe(&self, id: impl AsRef<str>) -> Option<crate::recipe::Recipe> {
-        self.recipe_map.lock().await.get(id.as_ref()).cloned()
+    pub async fn recipe(&self, slug: impl AsRef<str>) -> Option<crate::recipe::Recipe> {
+        let (_, recipes, _) = self
+            .query(format!("slug:{}", slug.as_ref()), 0, 1)
+            .await
+            .ok()?;
+        recipes.first().cloned()
     }
 
     pub async fn reload(&self) {
@@ -133,14 +137,14 @@ async fn asset_handler(Path(file): Path<String>) -> Result<crate::assets::Static
 }
 
 async fn recipe(
-    Path(id): Path<String>,
+    Path(slug): Path<String>,
     State(state): State<AppState>,
 ) -> Result<templates::Recipe<'static>> {
     state
-        .recipe(id)
+        .recipe(slug)
         .await
-        .ok_or(Error::NotFound)
         .map(templates::Recipe::from)
+        .ok_or(Error::NotFound)
 }
 
 async fn index(State(state): State<AppState>) -> Result<templates::RecipeIndex<'static>> {

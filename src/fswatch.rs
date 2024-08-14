@@ -1,4 +1,8 @@
-use std::{path::Path, pin::Pin, sync::Arc};
+use std::{
+    path::{Path, PathBuf},
+    pin::Pin,
+    sync::Arc,
+};
 
 use notify::{Result, Watcher};
 use smol::{
@@ -12,16 +16,27 @@ pub struct AsyncWatcher {
     channel: Pin<Box<smol::channel::Receiver<notify::Event>>>,
 }
 
+pub enum Event {
+    Update(PathBuf),
+    Remove(PathBuf),
+}
+
 impl AsyncWatcher {
     pub fn new(path: impl AsRef<Path>) -> Result<Self> {
         let (tx, rx) = channel::bounded(1);
 
         let mut watcher = notify::RecommendedWatcher::new(
             move |res: Result<notify::Event>| {
-                use notify::{event::AccessKind, EventKind};
+                use notify::{
+                    event::{AccessKind, RemoveKind},
+                    EventKind::{Access, Remove},
+                };
                 if let Ok(ev) = res {
-                    if let EventKind::Access(AccessKind::Close(_)) = ev.kind {
-                        tx.send_blocking(ev).unwrap();
+                    match ev.kind {
+                        Remove(RemoveKind::File) | Access(AccessKind::Close(_)) => {
+                            tx.send_blocking(ev).unwrap();
+                        }
+                        _ => (),
                     }
                 }
             },

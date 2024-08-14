@@ -10,7 +10,7 @@
     {%- let class = "secondary" -%}
   {% endif %}
   <summary class="{{ class }}">
-    <span class="category"><a href="/search?query=category:{{ category.to_lowercase() }}">{{ category }}</a></span>
+    <span class="category"><a href="/search?query=category:&quot;{{ category }}&quot;">{{ category }}</a></span>
     <span class="count">({{ recipes.len() }} recipes)</span>
   </summary>
   <table class="list striped">
@@ -39,7 +39,7 @@
           {{ PLACEHOLDER }}
       {%- else -%}
         {%- for tag in tags -%}
-        <span class="tag"><a href="/search?query=tag:{{ tag.to_lowercase() }}">{{ tag }}</a></span>&nbsp;
+        <span class="tag"><a href="/search?query=tag:{{ tag }}">{{ tag }}</a></span>&nbsp;
         {%- endfor -%}
       {%- endif -%}
         </td>

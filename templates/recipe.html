@@ -5,7 +5,34 @@
     <h2 id="title">{{ title }}</h2>
   </header>
   {{ recipe.contents()|safe }}
-{%- endblock content -%}
-{%- block scripts -%}
+  {% if let Some(metadata) = recipe.metadata() -%}
+  <footer>
+    <div class="metadata">
+      {% if !metadata.sources().is_empty() -%}
+      <span class="sources">
+        <b>Sources: </b>
+        {% for source in metadata.sources() -%}
+        <span class="source"><a href="{{ source.url() }}" target="_blank">{{ source.name() }}</a></span>
+        {% endfor -%}
+      </span>
+      {% endif -%}
+      {% if !metadata.tags().is_empty() -%}
+      <span class="tags">
+        <b>Tags: </b>
+        {% for tag in metadata.tags() -%}
+        <span class="tag">{{ tag }}</span>
+        {% endfor -%}
+      </span>
+      {% endif -%}
+      <span class="category">
+        <b>Category: </b>{{ metadata.category() }}
+      </span>
+    </div>
+  </footer>
+  {% endif -%}
+{% endblock content -%}
+{% block scripts -%}
 <script src="/assets/js/screen-wake.js"></script>
-{%- endblock -%}
+<script src="/assets/js/list-checker.js"></script>
+<script src="/assets/js/section-collapser.js"></script>
+{% endblock -%}

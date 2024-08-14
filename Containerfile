@@ -6,7 +6,7 @@ COPY . .
 RUN env cargo install --path .
 
 FROM docker.io/library/debian:bookworm-slim
-RUN mkdir /recipes
+WORKDIR /recipes
 RUN apt-get update && apt-get install -y libxapian30 && apt-get clean -y
 COPY --from=builder /usr/local/cargo/bin/pantry /usr/local/bin/pantry
 
