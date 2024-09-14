@@ -5,7 +5,7 @@ use crate::templates;
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
-    response::{IntoResponse, Response},
+    response::{IntoResponse, Redirect, Response},
     routing::get,
     Router,
 };
@@ -59,7 +59,9 @@ impl AppState {
     pub async fn categorized_recipes(&self) -> BTreeMap<String, Vec<crate::recipe::Recipe>> {
         let mut categorized_recipes = BTreeMap::default();
         for recipe in self.recipe_map.lock().await.values() {
-            let category = recipe.metadata().map_or("Unknown", |md| md.category());
+            let category = recipe
+                .metadata()
+                .map_or("Unknown", |md| md.category().as_ref());
             categorized_recipes
                 .entry(String::from(category))
                 .and_modify(|v: &mut Vec<_>| v.push(recipe.clone()))
@@ -136,6 +138,10 @@ async fn asset_handler(Path(file): Path<String>) -> Result<crate::assets::Static
     crate::assets::StaticFile::new(file).ok_or(Error::NotFound)
 }
 
+async fn index() -> impl IntoResponse {
+    Redirect::temporary("/search")
+}
+
 async fn recipe(
     Path(slug): Path<String>,
     State(state): State<AppState>,
@@ -145,12 +151,6 @@ async fn recipe(
         .await
         .map(templates::Recipe::from)
         .ok_or(Error::NotFound)
-}
-
-async fn index(State(state): State<AppState>) -> Result<templates::RecipeIndex<'static>> {
-    Ok(templates::RecipeIndex::from(
-        state.categorized_recipes().await,
-    ))
 }
 
 async fn search(

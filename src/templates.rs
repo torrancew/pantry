@@ -9,10 +9,29 @@ static LAYOUT: Layout = Layout;
 #[template(path = "_layout.html")]
 pub struct Layout;
 
+#[derive(Default, Template)]
+#[template(path = "_search_bar.html")]
+pub struct SearchBar {
+    query: Option<String>,
+}
+
+impl SearchBar {
+    pub fn new(query: impl Into<Option<String>>) -> Self {
+        Self {
+            query: query.into(),
+        }
+    }
+
+    pub fn query(&self) -> &str {
+        self.query.as_deref().unwrap_or_default()
+    }
+}
+
 #[derive(Template)]
 #[template(path = "recipe.html")]
 pub struct Recipe<'r> {
     parent: &'r Layout,
+    search_bar: SearchBar,
     recipe: crate::recipe::Recipe,
     title: String,
 }
@@ -22,6 +41,7 @@ impl From<crate::recipe::Recipe> for Recipe<'static> {
         let title = String::from(recipe.metadata().map_or("Unknown", |md| md.title()));
         Self {
             parent: &LAYOUT,
+            search_bar: Default::default(),
             recipe,
             title,
         }
@@ -37,41 +57,10 @@ impl Deref for Recipe<'_> {
 }
 
 #[derive(Template)]
-#[template(path = "recipe_index.html")]
-pub struct RecipeIndex<'l> {
-    parent: &'l Layout,
-    recipes: BTreeMap<String, Vec<crate::recipe::Recipe>>,
-}
-
-impl<I, V> From<I> for RecipeIndex<'static>
-where
-    I: IntoIterator<Item = (String, V)>,
-    V: IntoIterator<Item = crate::recipe::Recipe>,
-{
-    fn from(recipes: I) -> Self {
-        Self {
-            parent: &LAYOUT,
-            recipes: recipes
-                .into_iter()
-                .map(|(category, recipes)| (category, Vec::from_iter(recipes)))
-                .collect(),
-        }
-    }
-}
-
-impl Deref for RecipeIndex<'_> {
-    type Target = Layout;
-
-    fn deref(&self) -> &Self::Target {
-        self.parent
-    }
-}
-
-#[derive(Template)]
 #[template(path = "search.html")]
 pub struct Search<'s> {
     parent: &'s Layout,
-    query: Option<String>,
+    search_bar: SearchBar,
     categories: BTreeMap<String, usize>,
     recipes: Vec<crate::recipe::Recipe>,
     tags: BTreeMap<String, usize>,
@@ -86,10 +75,10 @@ impl Search<'_> {
     ) -> Self {
         Self {
             parent: &LAYOUT,
-            query: query.into(),
             categories: BTreeMap::from_iter(categories),
             recipes: Vec::from_iter(recipes),
             tags: BTreeMap::from_iter(tags),
+            search_bar: SearchBar::new(query),
         }
     }
 
@@ -110,7 +99,7 @@ impl Default for Search<'static> {
     fn default() -> Self {
         Self {
             parent: &LAYOUT,
-            query: None,
+            search_bar: Default::default(),
             categories: Default::default(),
             recipes: Default::default(),
             tags: Default::default(),

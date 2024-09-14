@@ -2,6 +2,7 @@ use crate::markdown;
 
 use std::{
     collections::{BTreeMap, BTreeSet},
+    fmt::{self, Display},
     io::{self, Read},
     path::{Path, PathBuf},
 };
@@ -18,6 +19,27 @@ use smol::{
 };
 use url::Url;
 use yaml_front_matter::YamlFrontMatter;
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
+pub struct Category(String);
+
+impl Category {
+    pub fn slug(&self) -> String {
+        slug::slugify(&self.0)
+    }
+}
+
+impl AsRef<str> for Category {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Display for Category {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Display::fmt(&self.0, f)
+    }
+}
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
 pub struct Source {
@@ -38,13 +60,15 @@ impl Source {
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
 pub struct MetaData {
     title: String,
-    category: String,
+    category: Category,
+    #[serde(default)]
     sources: Vec<Source>,
+    #[serde(default)]
     tags: BTreeSet<String>,
 }
 
 impl MetaData {
-    pub fn category(&self) -> &str {
+    pub fn category(&self) -> &Category {
         &self.category
     }
 
@@ -164,7 +188,7 @@ impl Recipe {
         }
     }
 
-    pub fn category(&self) -> Option<&str> {
+    pub fn category(&self) -> Option<&Category> {
         self.metadata().map(|md| md.category())
     }
 

@@ -36,6 +36,7 @@ async function wrapSection(ident) {
 async function modifyLists() {
   await wrapSection('ingredients');
   await wrapSection('directions');
+  await wrapSection('notes');
 }
 
 document.addEventListener("DOMContentLoaded", modifyLists);

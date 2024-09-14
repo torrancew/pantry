@@ -1,16 +1,6 @@
 {% extends "_layout.html" %}
 {% block content -%}
-{%- let search_field_value -%}
-{%- if let Some(query) = query -%}
-  {%- let search_field_value = query.clone() -%}
-{%- else -%}
-{%- let search_field_value = String::default() -%}
-{%- endif -%}
-<form action="/search" method="GET">
-  <input type="search" name="query" placeholder="Search Query" aria-label="Search Query" autofocus value="{{ search_field_value }}"/>
-  <input type="submit" hidden/>
-</form>
-<hr />
+{{ search_bar|safe }}
 {%- if self.is_filterable() -%}
 <div id="filters">
 {%- else -%}
@@ -24,7 +14,7 @@
     <details class="filters" open>
       <summary>Category</summary>
       {%- for (category, count) in categories -%}
-      {%- let new_query = format!("category:&quot;{category}&quot; {search_field_value}") -%}
+      {%- let new_query = format!(r#"category:"{category}"; {}"#, self.search_bar.query()) -%}
       <span class="badge"><a href="/search?query={{ new_query }}">{{ category }} ({{ count }})</a></span>
       {%- endfor -%}
       <br/>
@@ -34,7 +24,7 @@
     <details class="filters" open>
       <summary>Tags</summary>
       {%- for (tag, count) in tags -%}
-      {%- let new_query = format!("tag:{tag} {search_field_value}") -%}
+      {%- let new_query = format!("tag:{tag} {}", self.search_bar.query()) -%}
       <span><a href="/search?query={{ new_query }}">{{ tag }} ({{ count }})</a></span>
       {%- endfor -%}
       <br/>
@@ -64,7 +54,7 @@
       {%- endif -%}
       <td>
         {%- if let Some(category) = recipe.category() -%}
-        <a href="/search?query=category:&quot;{{ category.to_lowercase() }}&quot;">{{ category }}</a>
+        <a href="/search?query=category:&quot;{{ category }}&quot;">{{ category }}</a>
         {%- else -%}
         {{ PLACEHOLDER }}
         {%- endif -%}

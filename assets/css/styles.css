@@ -28,15 +28,15 @@ tr.recipe td.source {
 div.metadata, div.grid {
   display: grid;
 
-  @media (min-width: 576px) {
+  @media (min-width: 0px) {
     grid-template-columns: 1fr;
   }
 
-  @media (min-width: 768px) {
+  @media (min-width: 576px) {
     grid-template-columns: 1fr 1fr;
   }
 
-  @media (min-width: 1024px) {
+  @media (min-width: 768px) {
     grid-template-columns: 1fr 1fr 1fr;
   }
 }

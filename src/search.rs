@@ -210,7 +210,7 @@ impl Indexer {
         if let Some(category) = recipe.metadata().map(|md| md.category()) {
             self.term_generator.index_text(category, None, "XC:");
             self.term_generator.increase_termpos(None);
-            doc.set_value(1, category);
+            doc.set_value(1, category.as_ref());
         }
 
         if let Some(sources) = recipe.metadata().map(|md| md.sources()) {
