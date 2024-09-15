@@ -8,7 +8,6 @@ anyhow = "1.0.86"
 askama = "0.12.1"
 askama_axum = "0.4.0"
 async-io = "2.3.3"
-async-walkdir = "2.0.0"
 axum = "0.7.5"
 clap = { version = "4.5.7", features = ["derive", "env"] }
 comrak = "0.24.1"

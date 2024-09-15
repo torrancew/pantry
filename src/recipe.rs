@@ -7,16 +7,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use async_walkdir::{Filtering, WalkDir};
 use axum::{
     http::header,
     response::{IntoResponse, Response},
 };
 use serde::{Deserialize, Serialize};
-use smol::{
-    io::AsyncRead,
-    stream::{Stream, StreamExt},
-};
 use url::Url;
 use yaml_front_matter::YamlFrontMatter;
 
@@ -42,18 +37,32 @@ impl Display for Category {
 }
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
-pub struct Source {
-    name: String,
-    url: Url,
+#[serde(untagged)]
+pub enum Source {
+    Book { title: String, author: String },
+    Url { name: String, url: Url },
 }
 
 impl Source {
     pub fn name(&self) -> &str {
-        &self.name
+        match self {
+            Self::Book { title, .. } => title.as_str(),
+            Self::Url { name, .. } => name.as_str(),
+        }
     }
 
-    pub fn url(&self) -> &Url {
-        &self.url
+    pub fn attribution(&self) -> &str {
+        match self {
+            Self::Book { author, .. } => author.as_str(),
+            Self::Url { url, .. } => url.as_str(),
+        }
+    }
+
+    pub fn url(&self) -> Option<&Url> {
+        match self {
+            Self::Book { .. } => None,
+            Self::Url { url, .. } => Some(url),
+        }
     }
 }
 
@@ -100,13 +109,6 @@ impl Recipe {
         &self.contents
     }
 
-    pub async fn from_async_reader(r: impl AsyncRead) -> io::Result<Self> {
-        use smol::io::AsyncReadExt;
-        let mut input = String::new();
-        Box::pin(r).read_to_string(&mut input).await?;
-        Ok(Self::parse(input))
-    }
-
     pub fn from_reader(mut r: impl Read) -> io::Result<Self> {
         let mut input = String::new();
         r.read_to_string(&mut input)?;
@@ -132,32 +134,6 @@ impl Recipe {
                     }
                 })
             })
-    }
-
-    pub async fn load_all_async(path: impl AsRef<Path>) -> impl Stream<Item = Self> {
-        let identity = |f| f;
-        WalkDir::new(path)
-            .filter(|entry| async move {
-                if entry.file_name().to_string_lossy().starts_with('_') {
-                    Filtering::IgnoreDir
-                } else if entry.path().is_dir() {
-                    Filtering::Ignore
-                } else {
-                    Filtering::Continue
-                }
-            })
-            .then(|result| async move {
-                if let Ok(entry) = result {
-                    if let Ok(file) = smol::fs::File::open(entry.path()).await {
-                        Self::from_async_reader(file).await.ok()
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            })
-            .filter_map(identity)
     }
 
     fn as_html(&self) -> scraper::Html {

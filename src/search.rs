@@ -218,7 +218,7 @@ impl Indexer {
                 self.term_generator.index_text(src.name(), None, "XS:");
                 self.term_generator.increase_termpos(None);
 
-                if let Some(domain) = src.url().domain() {
+                if let Some(domain) = src.url().and_then(|url| url.domain()) {
                     self.term_generator.index_text(domain, None, "XD:");
                     self.term_generator.increase_termpos(None);
                 }

@@ -13,7 +13,17 @@
       <span class="sources">
         <b>Sources: </b>
         {% for source in metadata.sources() -%}
-        <span class="source"><a href="{{ source.url() }}" target="_blank">{{ source.name() }}</a></span>
+        <span class="source">
+          {% if let Some(url) = source.url() -%}
+          <a href="{{ url }}" target="_blank">{{ source.name() }}</a>
+          {% else -%}
+          <p>
+            <span class="book">{{ source.name() }}</span>
+            by
+            <span class="author">{{ source.attribution() }}</span>
+          </p>
+          {% endif -%}
+        </span>
         {% endfor -%}
       </span>
       {% endif -%}

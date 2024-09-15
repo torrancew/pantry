@@ -48,7 +48,11 @@
       <th scope="row"><a href="/recipe/{{ recipe.metadata().unwrap().slug() }}">{{ recipe.title().unwrap_or("Unknown") }}</a></th>
       <td>
       {%- if let Some(src) = recipe.sources().first() -%}
-        <a href="{{ src.url() }}" target="_blank">{{ src.name() }}</a>
+        {%- if let Some(url) = src.url() -%}
+        <a href="{{ url }}" target="_blank">{{ src.name() }}</a>
+        {%- else -%}
+        <p>{{ src.name() }} by {{ src.attribution () }}</p>
+        {%- endif -%}
       {%- else -%}
         {{ PLACEHOLDER }}
       {%- endif -%}
