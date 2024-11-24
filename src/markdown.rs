@@ -50,15 +50,32 @@ impl comrak::adapters::HeadingAdapter for HeadingTagger {
     }
 }
 
-#[derive(Default)]
 pub struct Parser {
-    options: comrak::Options,
+    options: comrak::Options<'static>,
     tagger: HeadingTagger,
+}
+
+impl Default for Parser {
+    fn default() -> Self {
+        let mut options = comrak::Options::default();
+        let cb = Box::new(Parser::resolve_broken_link);
+
+        options.parse = comrak::ParseOptionsBuilder::default()
+            .broken_link_callback(Some(Arc::new(Mutex::new(Box::leak(cb)))))
+            .build()
+            .unwrap();
+
+        Self {
+            options,
+            tagger: Default::default(),
+        }
+    }
 }
 
 impl Parser {
     pub fn parse(&self, mkd: impl AsRef<str>) -> String {
         use comrak::{PluginsBuilder, RenderPluginsBuilder};
+
         let plugins = PluginsBuilder::default()
             .render(
                 RenderPluginsBuilder::default()
@@ -70,6 +87,13 @@ impl Parser {
             .unwrap();
 
         comrak::markdown_to_html_with_plugins(mkd.as_ref(), &self.options, &plugins)
+    }
+
+    fn resolve_broken_link(link: comrak::BrokenLinkReference) -> Option<comrak::ResolvedReference> {
+        let url = format!("/recipe/{}", slug::slugify(link.normalized));
+        let title = String::from(link.original.trim_start_matches("[").trim_end_matches("]"));
+
+        Some(comrak::ResolvedReference { url, title })
     }
 }
 

@@ -11,6 +11,7 @@ use axum::{
 };
 use serde::Deserialize;
 use thiserror::Error;
+use tracing::info;
 
 #[derive(Debug, Error)]
 enum Error {
@@ -78,8 +79,32 @@ impl AppState {
         recipes.first().cloned()
     }
 
-    pub async fn reload(&self) {
-        let _ = self.xapian.reindex().await;
+    pub async fn reload(&self, paths: Option<Vec<std::path::PathBuf>>) {
+        if let Some(ref paths) = paths {
+            info!(
+                "Reloading entries: {:?}",
+                paths
+                    .iter()
+                    .map(|p| p.to_string_lossy())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            );
+        } else {
+            info!("Reloading all entries");
+        }
+        let _ = self.xapian.reindex(paths).await;
+    }
+
+    pub async fn remove(&self, paths: Vec<std::path::PathBuf>) {
+        info!(
+            "Removing entries: {}",
+            paths
+                .iter()
+                .map(|p| p.to_string_lossy())
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+        let _ = self.xapian.remove(paths).await;
     }
 }
 

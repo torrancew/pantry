@@ -45,9 +45,23 @@ details.filters span a:link, table a:link {
   text-decoration: none;
 }
 
-details.filter span a, td span.tag a {
+details.filters tr.recipe td span.tag {
+  padding: 12px 0;
+}
+
+details.filters span a, tr.recipe td span.tag a, div.metadata span.tag {
+  display: inline-block;
   background-color: var(--pico-primary-border);
-  border-radius: 10em;
   color: var(--pico-muted-border-color);
-  padding: 4px 8px;
+  padding: 0 12px;
+  margin: 0 5px 3px 0;
+  font-size: 13px;
+  cursor: pointer;
+  line-height: 32px;
+  height: 32px;
+  border-radius: 32px;
+}
+
+span.source span.book, span.source span.author {
+  font-style: italic;
 }

@@ -58,10 +58,20 @@ impl Source {
         }
     }
 
-    pub fn url(&self) -> Option<&Url> {
+    pub fn url(&self) -> Option<Url> {
         match self {
-            Self::Book { .. } => None,
-            Self::Url { url, .. } => Some(url),
+            Self::Book { title, author } => url::Url::parse_with_params(
+                "https://www.google.com/search",
+                &[
+                    ("tbm", "bks"),
+                    (
+                        "q",
+                        &format!(r#"intitle:"{title}" AND inauthor:"{author}""#),
+                    ),
+                ],
+            )
+            .ok(),
+            Self::Url { url, .. } => Some(url.clone()),
         }
     }
 }

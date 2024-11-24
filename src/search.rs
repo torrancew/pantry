@@ -1,6 +1,6 @@
 use std::{
     collections::BTreeMap,
-    io,
+    fs, io,
     path::{Path, PathBuf},
     sync::{Arc, RwLock},
     thread,
@@ -36,8 +36,21 @@ impl AsyncIndex {
         Ok(Self { rx, tx, thread })
     }
 
-    pub async fn reindex(&self) -> Result<(), Error> {
-        self.tx.send(Request::Reindex).await.unwrap();
+    pub async fn remove(&self, paths: Vec<PathBuf>) -> Result<(), Error> {
+        self.tx.send(Request::Remove(paths)).await.unwrap();
+        let response = self.rx.recv().await.unwrap()?;
+        match response {
+            Response::Reindex => Ok(()),
+            _ => Err(Error::InvalidResponse(response)),
+        }
+    }
+
+    pub async fn reindex(&self, paths: Option<Vec<PathBuf>>) -> Result<(), Error> {
+        if let Some(paths) = paths {
+            self.tx.send(Request::ReindexSome(paths)).await.unwrap();
+        } else {
+            self.tx.send(Request::ReindexAll).await.unwrap();
+        }
         let response = self.rx.recv().await.unwrap()?;
         match response {
             Response::Reindex => Ok(()),
@@ -150,6 +163,8 @@ pub enum Error {
     ChannelTx(#[from] channel::SendError<Request>),
     #[error("invalid response: {0:?}")]
     InvalidResponse(Response),
+    #[error("i/o error: {0}")]
+    Io(#[from] io::Error),
 }
 
 pub struct Indexer {
@@ -218,7 +233,7 @@ impl Indexer {
                 self.term_generator.index_text(src.name(), None, "XS:");
                 self.term_generator.increase_termpos(None);
 
-                if let Some(domain) = src.url().and_then(|url| url.domain()) {
+                if let Some(domain) = src.url().and_then(|url| url.domain().map(String::from)) {
                     self.term_generator.index_text(domain, None, "XD:");
                     self.term_generator.increase_termpos(None);
                 }
@@ -251,23 +266,39 @@ impl Indexer {
         self.db.replace_document_by_term(&idterm, doc);
     }
 
-    #[allow(dead_code, unused_variables)]
     fn remove_recipe(&mut self, path: impl AsRef<Path>) {
         let id = path.as_ref().to_string_lossy();
         let idterm = format!("I:{id}");
-        //self.db.delete_document_by_term(idterm)
-        todo!()
+        self.db.delete_document_by_term(idterm)
     }
 
     fn handle_request(&mut self, req: &Request) -> Result<Response, Error> {
         use Request::*;
         let recipe_dir = self.recipe_dir.clone();
         match req {
-            &Reindex => {
+            &ReindexAll => {
                 for (path, recipe) in Recipe::load_all(&recipe_dir) {
                     self.index_recipe(path, &recipe);
                 }
                 Ok(Response::Reindex)
+            }
+            ReindexSome(paths) => {
+                for (path, recipe) in paths.iter().filter_map(|p| {
+                    fs::File::open(p)
+                        .and_then(Recipe::from_reader)
+                        .map(|r| (p, r))
+                        .ok()
+                }) {
+                    self.index_recipe(path, &recipe);
+                }
+
+                Ok(Response::Reindex)
+            }
+            Remove(paths) => {
+                for path in paths {
+                    self.remove_recipe(path);
+                }
+                Ok(Response::Remove)
             }
             Search { query, size, start } => {
                 let mset = self.searcher.search(query, *start, *size);
@@ -298,7 +329,9 @@ impl Indexer {
 
 #[derive(Clone, Debug)]
 pub enum Request {
-    Reindex,
+    ReindexAll,
+    ReindexSome(Vec<PathBuf>),
+    Remove(Vec<PathBuf>),
     Search {
         query: String,
         size: u32,
@@ -309,6 +342,7 @@ pub enum Request {
 #[derive(Clone, Debug)]
 pub enum Response {
     Reindex,
+    Remove,
     Search {
         categories: BTreeMap<String, usize>,
         recipes: Vec<crate::recipe::Recipe>,

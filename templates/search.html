@@ -1,85 +1,87 @@
 {% extends "_layout.html" %}
 {% block content -%}
 {{ search_bar|safe }}
-{%- if self.is_filterable() -%}
-<div id="filters">
-{%- else -%}
-<div id="filters" hidden>
-{%- endif -%}
+<div id="results">
   {%- if self.is_filterable() -%}
-  <b>Filters</b><br /><br />
+  <div id="filters">
+  {%- else -%}
+  <div id="filters" hidden>
   {%- endif -%}
-  <div class="grid badges">
-  {%- if self.has_many_categories() -%}
-    <details class="filters" open>
-      <summary>Category</summary>
-      {%- for (category, count) in categories -%}
-      {%- let new_query = format!(r#"category:"{category}"; {}"#, self.search_bar.query()) -%}
-      <span class="badge"><a href="/search?query={{ new_query }}">{{ category }} ({{ count }})</a></span>
-      {%- endfor -%}
-      <br/>
-    </details>
-  {%- endif -%}
-  {%- if self.has_many_tags() -%}
-    <details class="filters" open>
-      <summary>Tags</summary>
-      {%- for (tag, count) in tags -%}
-      {%- let new_query = format!("tag:{tag} {}", self.search_bar.query()) -%}
-      <span><a href="/search?query={{ new_query }}">{{ tag }} ({{ count }})</a></span>
-      {%- endfor -%}
-      <br/>
-    </details>
-  {%- endif -%}
-  </div>
-  <hr/>
-</div>
-<table id="results" class="striped">
-  <thead>
-    <tr class="heading">
-      <th scope="col">Name</th>
-      <th scope="col">Source</th>
-      <th scope="col">Category</th>
-      <th scope="col">Tags</th>
-    </tr>
-  </thead>
-  <tbody>
-    {%- for recipe in recipes -%}
-    <tr class="recipe">
-      <th scope="row"><a href="/recipe/{{ recipe.metadata().unwrap().slug() }}">{{ recipe.title().unwrap_or("Unknown") }}</a></th>
-      <td>
-      {%- if let Some(src) = recipe.sources().first() -%}
-        {%- if let Some(url) = src.url() -%}
-        <a href="{{ url }}" target="_blank">{{ src.name() }}</a>
-        {%- else -%}
-        <p>{{ src.name() }} by {{ src.attribution () }}</p>
-        {%- endif -%}
-      {%- else -%}
-        {{ PLACEHOLDER }}
-      {%- endif -%}
-      <td>
-        {%- if let Some(category) = recipe.category() -%}
-        <a href="/search?query=category:&quot;{{ category }}&quot;">{{ category }}</a>
-        {%- else -%}
-        {{ PLACEHOLDER }}
-        {%- endif -%}
-      </td>
-      <td>
-      {%- if recipe.tags().is_empty() -%}
-        {{ PLACEHOLDER }}
-      {%- else -%}
-        {%- for tag in recipe.tags() -%}
-        {%- let fixed_tag -%}
-        {%- if let Some((pfx, sfx)) = tag.split_once(':') -%}
-        {%- let fixed_tag = pfx.to_string() -%}
-        {%- else -%}
-        {%- let fixed_tag = tag.clone() -%}
-        {%- endif -%}
-        <span class="tag"><a href="/search?query=tag:{{ fixed_tag }}">{{ tag }}</a></span>
+    {%- if self.is_filterable() -%}
+    <b>Filters</b><br /><br />
+    {%- endif -%}
+    <div class="grid badges">
+    {%- if self.has_many_categories() -%}
+      <details class="filters" open>
+        <summary>Category</summary>
+        {%- for (category, count) in categories -%}
+        {%- let new_query = format!(r#"category:"{category}"; {}"#, self.search_bar.query()) -%}
+        <span class="badge"><a href="/search?query={{ new_query }}">{{ category }} ({{ count }})</a></span>
         {%- endfor -%}
-      {%- endif -%}
-      </td>
-    </tr>
-    {%- endfor -%}
-  </tbody>
-</table>
+        <br/>
+      </details>
+    {%- endif -%}
+    {%- if self.has_many_tags() -%}
+      <details class="filters" open>
+        <summary>Tags</summary>
+        {%- for (tag, count) in tags -%}
+        {%- let new_query = format!("tag:{tag} {}", self.search_bar.query()) -%}
+        <span><a href="/search?query={{ new_query }}">{{ tag }} ({{ count }})</a></span>
+        {%- endfor -%}
+        <br/>
+      </details>
+    {%- endif -%}
+    </div>
+    <hr/>
+  </div>
+  <table class="striped">
+    <thead>
+      <tr class="heading">
+        <th scope="col">Name</th>
+        <th scope="col">Source</th>
+        <th scope="col">Category</th>
+        <th scope="col">Tags</th>
+      </tr>
+    </thead>
+    <tbody>
+      {%- for recipe in recipes -%}
+      <tr class="recipe">
+        <th scope="row"><a href="/recipe/{{ recipe.metadata().unwrap().slug() }}">{{ recipe.title().unwrap_or("Unknown") }}</a></th>
+        <td>
+        {%- if let Some(src) = recipe.sources().first() -%}
+          {%- if let Some(url) = src.url() -%}
+          <a href="{{ url }}" target="_blank">{{ src.name() }}</a>
+          {%- else -%}
+          <p>{{ src.name() }} by {{ src.attribution () }}</p>
+          {%- endif -%}
+        {%- else -%}
+          {{ PLACEHOLDER }}
+        {%- endif -%}
+        <td>
+          {%- if let Some(category) = recipe.category() -%}
+          <a href="/search?query=category:&quot;{{ category }}&quot;">{{ category }}</a>
+          {%- else -%}
+          {{ PLACEHOLDER }}
+          {%- endif -%}
+        </td>
+        <td>
+        {%- if recipe.tags().is_empty() -%}
+          {{ PLACEHOLDER }}
+        {%- else -%}
+          {%- for tag in recipe.tags() -%}
+          {%- let fixed_tag -%}
+          {%- if let Some((pfx, sfx)) = tag.split_once(':') -%}
+          {%- let fixed_tag = pfx.to_string() -%}
+          {%- else -%}
+          {%- let fixed_tag = tag.clone() -%}
+          {%- endif -%}
+          <span class="tag"><a href="/search?query=tag:{{ fixed_tag }}">{{ tag }}</a></span>
+          {%- endfor -%}
+        {%- endif -%}
+        </td>
+      </tr>
+      {%- endfor -%}
+    </tbody>
+  </table>
+</div>
 {%- endblock content -%}
