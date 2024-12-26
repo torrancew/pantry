@@ -1,4 +1,5 @@
 !.gitkeep
+/.cargo
 fly.toml
 /data
 /target

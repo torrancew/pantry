@@ -58,19 +58,7 @@ impl AsyncIndex {
         }
     }
 
-    pub async fn query(
-        &self,
-        query: &str,
-        start: u32,
-        size: u32,
-    ) -> Result<
-        (
-            BTreeMap<String, usize>,
-            Vec<crate::recipe::Recipe>,
-            BTreeMap<String, usize>,
-        ),
-        Error,
-    > {
+    pub async fn query(&self, query: &str, start: u32, size: u32) -> Result<SearchResult, Error> {
         self.tx
             .send(Request::Search {
                 query: String::from(query),
@@ -82,11 +70,7 @@ impl AsyncIndex {
 
         let response = self.rx.recv().await.unwrap()?;
         match response {
-            Response::Search {
-                categories,
-                recipes,
-                tags,
-            } => Ok((categories, recipes, tags)),
+            Response::Search(results) => Ok(results),
             _ => Err(Error::InvalidResponse(response)),
         }
     }
@@ -202,7 +186,7 @@ impl Indexer {
         }
     }
 
-    pub fn index_recipe(&mut self, id: impl AsRef<Path>, recipe: &crate::recipe::Recipe) {
+    pub fn index_recipe(&mut self, id: impl AsRef<Path>, recipe: &Recipe) {
         let mut doc = xapian::Document::default();
         self.term_generator.set_document(&doc);
         doc.set_data(serde_json::to_string(recipe).unwrap());
@@ -302,17 +286,16 @@ impl Indexer {
             }
             Search { query, size, start } => {
                 let mset = self.searcher.search(query, *start, *size);
-                Ok(Response::Search {
-                    categories: self.searcher.categories().collect(),
-                    recipes: mset
-                        .matches()
-                        .map(|m| {
-                            let doc = m.document();
-                            serde_json::from_slice(&doc.data()).unwrap()
-                        })
-                        .collect(),
-                    tags: self.searcher.tags().collect(),
-                })
+                let results = mset.matches().map(|m| {
+                    let doc = m.document();
+                    serde_json::from_slice(&doc.data()).unwrap()
+                });
+
+                Ok(Response::Search(SearchResult::new(
+                    self.searcher.categories(),
+                    results,
+                    self.searcher.tags(),
+                )))
             }
         }
     }
@@ -343,11 +326,7 @@ pub enum Request {
 pub enum Response {
     Reindex,
     Remove,
-    Search {
-        categories: BTreeMap<String, usize>,
-        recipes: Vec<crate::recipe::Recipe>,
-        tags: BTreeMap<String, usize>,
-    },
+    Search(SearchResult),
 }
 
 pub struct Searcher {
@@ -408,7 +387,39 @@ impl Searcher {
         self.tagger.reset();
         let query = self.query_parser.parse_query(query, None, "");
         self.enquire.set_query(query, None);
-        self.enquire
-            .mset(start, size, self.db.doc_count(), None, None)
+        self.enquire.mset(start, size, self.db.doc_count(), None)
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct SearchResult {
+    categories: BTreeMap<String, usize>,
+    matches: Vec<Recipe>,
+    tags: BTreeMap<String, usize>,
+}
+
+impl SearchResult {
+    pub fn new(
+        categories: impl IntoIterator<Item = (String, usize)>,
+        matches: impl IntoIterator<Item = Recipe>,
+        tags: impl IntoIterator<Item = (String, usize)>,
+    ) -> Self {
+        Self {
+            categories: categories.into_iter().collect(),
+            matches: matches.into_iter().collect(),
+            tags: tags.into_iter().collect(),
+        }
+    }
+
+    pub fn categories(&self) -> &BTreeMap<String, usize> {
+        &self.categories
+    }
+
+    pub fn matches(&self) -> &Vec<Recipe> {
+        &self.matches
+    }
+
+    pub fn tags(&self) -> &BTreeMap<String, usize> {
+        &self.tags
     }
 }

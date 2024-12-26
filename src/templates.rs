@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, ops::Deref};
+use std::ops::Deref;
 
 use askama_axum::Template;
 
@@ -61,33 +61,24 @@ impl Deref for Recipe<'_> {
 pub struct Search<'s> {
     parent: &'s Layout,
     search_bar: SearchBar,
-    categories: BTreeMap<String, usize>,
-    recipes: Vec<crate::recipe::Recipe>,
-    tags: BTreeMap<String, usize>,
+    results: crate::search::SearchResult,
 }
 
 impl Search<'_> {
-    pub fn new(
-        query: impl Into<Option<String>>,
-        recipes: impl IntoIterator<Item = crate::recipe::Recipe>,
-        categories: impl IntoIterator<Item = (String, usize)>,
-        tags: impl IntoIterator<Item = (String, usize)>,
-    ) -> Self {
+    pub fn new(query: impl Into<Option<String>>, results: crate::search::SearchResult) -> Self {
         Self {
             parent: &LAYOUT,
-            categories: BTreeMap::from_iter(categories),
-            recipes: Vec::from_iter(recipes),
-            tags: BTreeMap::from_iter(tags),
             search_bar: SearchBar::new(query),
+            results,
         }
     }
 
     pub fn has_many_categories(&self) -> bool {
-        self.categories.keys().len() > 1
+        self.results.categories().keys().len() > 1
     }
 
     pub fn has_many_tags(&self) -> bool {
-        self.tags.keys().len() > 1
+        self.results.tags().keys().len() > 1
     }
 
     pub fn is_filterable(&self) -> bool {
@@ -100,9 +91,7 @@ impl Default for Search<'static> {
         Self {
             parent: &LAYOUT,
             search_bar: Default::default(),
-            categories: Default::default(),
-            recipes: Default::default(),
-            tags: Default::default(),
+            results: Default::default(),
         }
     }
 }

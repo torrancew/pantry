@@ -14,7 +14,7 @@
     {%- if self.has_many_categories() -%}
       <details class="filters" open>
         <summary>Category</summary>
-        {%- for (category, count) in categories -%}
+        {%- for (category, count) in results.categories() -%}
         {%- let new_query = format!(r#"category:"{category}"; {}"#, self.search_bar.query()) -%}
         <span class="badge"><a href="/search?query={{ new_query }}">{{ category }} ({{ count }})</a></span>
         {%- endfor -%}
@@ -24,7 +24,7 @@
     {%- if self.has_many_tags() -%}
       <details class="filters" open>
         <summary>Tags</summary>
-        {%- for (tag, count) in tags -%}
+        {%- for (tag, count) in results.tags() -%}
         {%- let new_query = format!("tag:{tag} {}", self.search_bar.query()) -%}
         <span><a href="/search?query={{ new_query }}">{{ tag }} ({{ count }})</a></span>
         {%- endfor -%}
@@ -44,7 +44,7 @@
       </tr>
     </thead>
     <tbody>
-      {%- for recipe in recipes -%}
+      {%- for recipe in results.matches() -%}
       <tr class="recipe">
         <th scope="row"><a href="/recipe/{{ recipe.metadata().unwrap().slug() }}">{{ recipe.title().unwrap_or("Unknown") }}</a></th>
         <td>

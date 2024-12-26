@@ -11,18 +11,13 @@ use axum::{
     http::header,
     response::{IntoResponse, Response},
 };
+use recipe_scraper::SchemaOrgRecipe;
 use serde::{Deserialize, Serialize};
 use url::Url;
 use yaml_front_matter::YamlFrontMatter;
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
 pub struct Category(String);
-
-impl Category {
-    pub fn slug(&self) -> String {
-        slug::slugify(&self.0)
-    }
-}
 
 impl AsRef<str> for Category {
     fn as_ref(&self) -> &str {
@@ -33,6 +28,12 @@ impl AsRef<str> for Category {
 impl Display for Category {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         Display::fmt(&self.0, f)
+    }
+}
+
+impl From<String> for Category {
+    fn from(value: String) -> Self {
+        Self(value)
     }
 }
 
@@ -60,6 +61,7 @@ impl Source {
 
     pub fn url(&self) -> Option<Url> {
         match self {
+            Self::Url { url, .. } => Some(url.clone()),
             Self::Book { title, author } => url::Url::parse_with_params(
                 "https://www.google.com/search",
                 &[
@@ -71,7 +73,6 @@ impl Source {
                 ],
             )
             .ok(),
-            Self::Url { url, .. } => Some(url.clone()),
         }
     }
 }
@@ -112,6 +113,89 @@ impl MetaData {
 pub struct Recipe {
     metadata: Option<MetaData>,
     contents: String,
+}
+
+impl From<SchemaOrgRecipe> for Recipe {
+    fn from(recipe: SchemaOrgRecipe) -> Self {
+        let metadata = MetaData {
+            title: recipe.name().clone(),
+            category: String::from("Imported").into(),
+            sources: Default::default(),
+            tags: Default::default(),
+        }
+        .into();
+
+        let mut markdown = String::with_capacity(2048);
+
+        markdown.push_str(recipe.description());
+        markdown.push_str("\n\n");
+
+        if let Some(prep_time) = recipe.prep_time().as_ref().and_then(|d| d.human_readable()) {
+            markdown.push_str("**Prep Time:** ");
+            markdown.push_str(&prep_time);
+            markdown.push_str("\n\n");
+        }
+
+        if let Some(cook_time) = recipe.cook_time().as_ref().and_then(|d| d.human_readable()) {
+            markdown.push_str("**Cook Time:** ");
+            markdown.push_str(&cook_time);
+            markdown.push_str("\n\n");
+        }
+
+        if let Some(total_time) = recipe
+            .total_time()
+            .as_ref()
+            .and_then(|d| d.human_readable())
+        {
+            markdown.push_str("**Total Time:** ");
+            markdown.push_str(&total_time);
+            markdown.push_str("\n\n");
+        }
+
+        let ingredients = recipe
+            .ingredients()
+            .clone()
+            .into_iter()
+            .map(|i| format!("- {i}\n"))
+            .collect::<Vec<_>>();
+
+        if !ingredients.is_empty() {
+            markdown.push_str("## Ingredients\n\n");
+            markdown.push_str(&ingredients.join(""));
+            markdown.push('\n');
+        }
+
+        if let Some(directions) = recipe.directions().clone() {
+            markdown.push_str("## Directions\n\n");
+            if let Some(sections) = directions.sections() {
+                for section in sections {
+                    markdown.push_str(&format!("### {}\n\n", section.name()));
+                    let steps = section
+                        .clone()
+                        .into_iter()
+                        .map(|step| format!("- {step}\n"))
+                        .collect::<Vec<_>>();
+                    markdown.push_str(&steps.join(""));
+                    markdown.push('\n');
+                }
+            } else if let Some(directions) = directions.directions() {
+                markdown.push_str(
+                    &directions
+                        .into_iter()
+                        .map(|d| d.to_string())
+                        .collect::<Vec<_>>()
+                        .join(""),
+                )
+            }
+
+            markdown.push_str("\n\n");
+        }
+
+        Self {
+            metadata,
+            ..Self::parse(markdown)
+        }
+    }
 }
 
 impl Recipe {

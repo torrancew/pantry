@@ -7,6 +7,7 @@ edition = "2021"
 anyhow = "1"
 askama = "0"
 askama_axum = "0"
+async-compat = "0.2.4"
 axum = "0"
 clap = { version = "4", features = ["derive", "env"] }
 comrak = "0"
@@ -14,6 +15,8 @@ dirs = "5"
 macro_rules_attribute = "0"
 mime_guess = "2"
 notify = "6"
+recipe-scraper = "0.1.0"
+reqwest = { version = "0.12.9", features = ["rustls-tls", "rustls-tls-native-roots"], default-features = false }
 rust-embed = { version = "8", features = ["interpolate-folder-path"] }
 scraper = "0"
 serde = { version = "1", features = ["derive"] }
@@ -23,10 +26,9 @@ smol = "2"
 smol-axum = { version = "0", features = ["async-net"] }
 smol-macros = "0"
 thiserror = "1"
-toml = "0.8.19"
 tracing = "0"
 tracing-subscriber = { version = "0", features = ["env-filter"]}
 url = { version = "2", features = ["serde"] }
 walkdir = "2"
-xapian-rs = "0.2.0"
+xapian-rs = "0.3.0"
 yaml-front-matter = "0"

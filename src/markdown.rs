@@ -55,6 +55,7 @@ pub struct Parser {
     tagger: HeadingTagger,
 }
 
+#[allow(clippy::arc_with_non_send_sync)]
 impl Default for Parser {
     fn default() -> Self {
         let mut options = comrak::Options::default();
