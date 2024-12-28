@@ -61,10 +61,9 @@ impl Default for Parser {
         let mut options = comrak::Options::default();
         let cb = Box::new(Parser::resolve_broken_link);
 
-        options.parse = comrak::ParseOptionsBuilder::default()
-            .broken_link_callback(Some(Arc::new(Mutex::new(Box::leak(cb)))))
-            .build()
-            .unwrap();
+        options.parse = comrak::ParseOptions::builder()
+            .broken_link_callback(Arc::new(cb))
+            .build();
 
         Self {
             options,
@@ -75,17 +74,15 @@ impl Default for Parser {
 
 impl Parser {
     pub fn parse(&self, mkd: impl AsRef<str>) -> String {
-        use comrak::{PluginsBuilder, RenderPluginsBuilder};
+        use comrak::{Plugins, RenderPlugins};
 
-        let plugins = PluginsBuilder::default()
+        let plugins = Plugins::builder()
             .render(
-                RenderPluginsBuilder::default()
-                    .heading_adapter(Some(&self.tagger))
-                    .build()
-                    .unwrap(),
+                RenderPlugins::builder()
+                    .heading_adapter(&self.tagger)
+                    .build(),
             )
-            .build()
-            .unwrap();
+            .build();
 
         comrak::markdown_to_html_with_plugins(mkd.as_ref(), &self.options, &plugins)
     }
