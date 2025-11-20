@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use askama_axum::Template;
+use askama::Template;
 
 const PLACEHOLDER: &str = "—";
 static LAYOUT: Layout = Layout;
@@ -32,12 +32,12 @@ impl SearchBar {
 pub struct Recipe<'r> {
     parent: &'r Layout,
     search_bar: SearchBar,
-    recipe: crate::recipe::Recipe,
+    recipe: crate::recipe::MarkdownRecipe,
     title: String,
 }
 
-impl From<crate::recipe::Recipe> for Recipe<'static> {
-    fn from(recipe: crate::recipe::Recipe) -> Self {
+impl From<crate::recipe::MarkdownRecipe> for Recipe<'static> {
+    fn from(recipe: crate::recipe::MarkdownRecipe) -> Self {
         let title = String::from(recipe.metadata().map_or("Unknown", |md| md.title()));
         Self {
             parent: &LAYOUT,

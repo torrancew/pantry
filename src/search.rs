@@ -11,7 +11,7 @@ use thiserror::Error;
 use xapian::StemStrategy;
 use xapian_rs as xapian;
 
-use crate::recipe::Recipe;
+use crate::recipe::MarkdownRecipe;
 
 #[derive(Clone)]
 pub struct AsyncIndex {
@@ -186,7 +186,7 @@ impl Indexer {
         }
     }
 
-    pub fn index_recipe(&mut self, id: impl AsRef<Path>, recipe: &Recipe) {
+    pub fn index_recipe(&mut self, id: impl AsRef<Path>, recipe: &MarkdownRecipe) {
         let mut doc = xapian::Document::default();
         self.term_generator.set_document(&doc);
         doc.set_data(serde_json::to_string(recipe).unwrap());
@@ -261,7 +261,7 @@ impl Indexer {
         let recipe_dir = self.recipe_dir.clone();
         match req {
             &ReindexAll => {
-                for (path, recipe) in Recipe::load_all(&recipe_dir) {
+                for (path, recipe) in MarkdownRecipe::load_all(&recipe_dir) {
                     self.index_recipe(path, &recipe);
                 }
                 Ok(Response::Reindex)
@@ -269,7 +269,13 @@ impl Indexer {
             ReindexSome(paths) => {
                 for (path, recipe) in paths.iter().filter_map(|p| {
                     fs::File::open(p)
-                        .and_then(Recipe::from_reader)
+                        .and_then(|r| {
+                            let maybe_recipe = MarkdownRecipe::from_reader(r);
+                            if maybe_recipe.is_err() {
+                                tracing::info!("Failed to decode recipe: {maybe_recipe:?}");
+                            }
+                            maybe_recipe
+                        })
                         .map(|r| (p, r))
                         .ok()
                 }) {
@@ -394,14 +400,14 @@ impl Searcher {
 #[derive(Clone, Debug, Default)]
 pub struct SearchResult {
     categories: BTreeMap<String, usize>,
-    matches: Vec<Recipe>,
+    matches: Vec<MarkdownRecipe>,
     tags: BTreeMap<String, usize>,
 }
 
 impl SearchResult {
     pub fn new(
         categories: impl IntoIterator<Item = (String, usize)>,
-        matches: impl IntoIterator<Item = Recipe>,
+        matches: impl IntoIterator<Item = MarkdownRecipe>,
         tags: impl IntoIterator<Item = (String, usize)>,
     ) -> Self {
         Self {
@@ -415,7 +421,7 @@ impl SearchResult {
         &self.categories
     }
 
-    pub fn matches(&self) -> &Vec<Recipe> {
+    pub fn matches(&self) -> &Vec<MarkdownRecipe> {
         &self.matches
     }
 

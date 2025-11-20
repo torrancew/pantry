@@ -8,7 +8,6 @@ mod templates;
 
 use std::{io, net::SocketAddr, path::PathBuf, sync::Arc};
 
-use axum::Router;
 use clap::Parser;
 use macro_rules_attribute::apply;
 use smol::{net::TcpListener, stream::StreamExt};
@@ -24,16 +23,6 @@ struct Args {
     recipe_dir: Option<PathBuf>,
 }
 
-async fn web_server(
-    ex: &Arc<Executor<'_>>,
-    listen_on: &SocketAddr,
-    service: Router,
-) -> io::Result<()> {
-    let listener = TcpListener::bind(listen_on).await?;
-    info!("Listening on {listen_on}");
-    smol_axum::serve(ex.clone(), listener, service).await
-}
-
 fn resolve_recipe_dir(args: &Args) -> Option<PathBuf> {
     [
         args.recipe_dir.clone(),
@@ -46,7 +35,7 @@ fn resolve_recipe_dir(args: &Args) -> Option<PathBuf> {
 }
 
 #[apply(main)]
-async fn main(ex: &Arc<Executor<'_>>) -> anyhow::Result<()> {
+async fn main(ex: &Arc<Executor<'_>>) -> io::Result<()> {
     let logger = FmtSubscriber::builder()
         .with_env_filter(
             EnvFilter::builder()
@@ -76,9 +65,12 @@ async fn main(ex: &Arc<Executor<'_>>) -> anyhow::Result<()> {
         })
     };
 
+    let listener = TcpListener::bind(args.listen_on).await?;
+    info!("Listening on {}", args.listen_on);
+
     // Perform an initial load of the dataset
     app_state.reload(None).await;
-    Ok(web_server(ex, &args.listen_on, routes::router(app_state)).await?)
+    smol_axum::serve(ex.clone(), listener, routes::router(app_state)).await
 }
 
 // https://notgull.net/new-smol-rs-subcrates/
