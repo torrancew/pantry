@@ -1,7 +1,5 @@
-use crate::templates;
+use crate::templates::{self, CustomTemplate};
 
-use askama::Template;
-use async_compat::CompatExt;
 use axum::{
     extract::{rejection::QueryRejection, Path, Query, State},
     http::StatusCode,
@@ -123,10 +121,10 @@ struct SearchParams {
 pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/manifest.json", get(pwa_manifest))
-        .route("/assets/*file", get(asset_handler))
+        .route("/assets/{*file}", get(asset_handler))
         .route("/", get(index))
         .route("/recipe", get(import_recipe))
-        .route("/recipe/:id", get(recipe))
+        .route("/recipe/{id}", get(recipe))
         .route("/search", get(search))
         .layer(
             TraceLayer::new_for_http()
@@ -173,40 +171,43 @@ pub struct ImportRecipeParams {
 
 async fn import_recipe(
     Query(ImportRecipeParams { url }): Query<ImportRecipeParams>,
-) -> Result<String> {
-    let body = reqwest::get(url).compat().await?.text().await?;
+) -> Result<impl IntoResponse> {
+    let body = reqwest::get(url).await?.text().await?;
     if let Some(first_valid_recipe) = recipe_scraper::SchemaOrgEntry::scrape_html(&body)
         .iter()
         .flat_map(Extract::extract_recipes)
         .next()
     {
-        Ok(
-            templates::Recipe::from(crate::recipe::MarkdownRecipe::from(first_valid_recipe))
-                .render()?,
-        )
+        Ok(CustomTemplate::from(templates::Recipe::from(
+            crate::recipe::MarkdownRecipe::from(first_valid_recipe),
+        )))
     } else {
         Err(Error::NotFound)
     }
 }
 
-async fn recipe(Path(slug): Path<String>, State(state): State<AppState>) -> Result<String> {
-    Ok(state
+async fn recipe(
+    Path(slug): Path<String>,
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse> {
+    let recipe = state
         .recipe(slug)
         .await
         .map(templates::Recipe::from)
-        .ok_or(Error::NotFound)?
-        .render()?)
+        .ok_or(Error::NotFound)?;
+
+    Ok(CustomTemplate::from(recipe))
 }
 
 #[axum::debug_handler]
 async fn search(
     params: Result<Query<SearchParams>, QueryRejection>,
     State(state): State<AppState>,
-) -> Result<String> {
+) -> Result<impl IntoResponse> {
     if let Ok(Query(SearchParams { query, start, size })) = params {
         let results = state.query(&query, start, size).await?;
-        Ok(templates::Search::new(query, results).render()?)
+        Ok(CustomTemplate::from(templates::Search::new(query, results)))
     } else {
-        Ok(templates::Search::default().render()?)
+        Ok(CustomTemplate::from(templates::Search::default()))
     }
 }

@@ -6,12 +6,11 @@ mod routes;
 mod search;
 mod templates;
 
-use std::{io, net::SocketAddr, path::PathBuf, sync::Arc};
+use std::{net::SocketAddr, path::PathBuf};
 
+use anyhow::Context;
 use clap::Parser;
-use macro_rules_attribute::apply;
-use smol::{net::TcpListener, stream::StreamExt};
-use smol_macros::{main, Executor};
+use tokio::net::TcpListener;
 use tracing::info;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
@@ -34,8 +33,8 @@ fn resolve_recipe_dir(args: &Args) -> Option<PathBuf> {
     .flatten()
 }
 
-#[apply(main)]
-async fn main(ex: &Arc<Executor<'_>>) -> io::Result<()> {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     let logger = FmtSubscriber::builder()
         .with_env_filter(
             EnvFilter::builder()
@@ -43,23 +42,23 @@ async fn main(ex: &Arc<Executor<'_>>) -> io::Result<()> {
                 .from_env_lossy(),
         )
         .finish();
+
     tracing::subscriber::set_global_default(logger)?;
 
     let args = Args::parse();
-    let recipe_dir = resolve_recipe_dir(&args)
-        .expect("Unable to find data directory, please specify --recipe-dir!");
+    let recipe_dir = resolve_recipe_dir(&args).context("Unable to find recipe directory")?;
 
     let app_state = routes::AppState::new(&recipe_dir);
 
     let _reloader = {
         let app_state = app_state.clone();
         let mut watcher = fswatch::AsyncWatcher::new(&recipe_dir)?;
-        ex.spawn(async move {
-            use fswatch::Event;
+        tokio::spawn(async move {
             while let Some(ev) = watcher.next().await {
                 match ev {
-                    Event::Update(paths) => app_state.reload(Some(paths)).await,
-                    Event::Remove(paths) => app_state.remove(paths).await,
+                    Ok(fswatch::Event::Update(paths)) => app_state.reload(Some(paths)).await,
+                    Ok(fswatch::Event::Remove(paths)) => app_state.remove(paths).await,
+                    Err(_) => {}
                 }
             }
         })
@@ -70,7 +69,7 @@ async fn main(ex: &Arc<Executor<'_>>) -> io::Result<()> {
 
     // Perform an initial load of the dataset
     app_state.reload(None).await;
-    smol_axum::serve(ex.clone(), listener, routes::router(app_state)).await
+    Ok(axum::serve(listener, routes::router(app_state).into_make_service()).await?)
 }
 
 // https://notgull.net/new-smol-rs-subcrates/

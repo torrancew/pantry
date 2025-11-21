@@ -6,7 +6,7 @@ use std::{
     thread,
 };
 
-use smol::channel;
+use tokio::sync::mpsc::{self, error::SendError};
 use thiserror::Error;
 use xapian::StemStrategy;
 use xapian_rs as xapian;
@@ -15,16 +15,16 @@ use crate::recipe::MarkdownRecipe;
 
 #[derive(Clone)]
 pub struct AsyncIndex {
-    rx: channel::Receiver<Result<Response, Error>>,
-    tx: channel::Sender<Request>,
+    rx: Arc<tokio::sync::Mutex<mpsc::Receiver<Result<Response, Error>>>>,
+    tx: mpsc::Sender<Request>,
     #[allow(dead_code)]
     thread: Arc<thread::JoinHandle<()>>,
 }
 
 impl AsyncIndex {
     pub fn new(recipe_dir: impl AsRef<Path>) -> io::Result<Self> {
-        let (tx, requester) = channel::bounded(1);
-        let (responder, rx) = channel::bounded(1);
+        let (tx, requester) = mpsc::channel(1);
+        let (responder, rx) = mpsc::channel(1);
         let recipe_dir = PathBuf::from(recipe_dir.as_ref());
 
         let thread = Arc::new(
@@ -33,12 +33,12 @@ impl AsyncIndex {
                 .spawn(move || Indexer::new(recipe_dir, requester, responder).serve())?,
         );
 
-        Ok(Self { rx, tx, thread })
+        Ok(Self { rx: Arc::new(tokio::sync::Mutex::new(rx)), tx, thread })
     }
 
     pub async fn remove(&self, paths: Vec<PathBuf>) -> Result<(), Error> {
         self.tx.send(Request::Remove(paths)).await.unwrap();
-        let response = self.rx.recv().await.unwrap()?;
+        let response = self.rx.lock().await.recv().await.unwrap()?;
         match response {
             Response::Reindex => Ok(()),
             _ => Err(Error::InvalidResponse(response)),
@@ -51,7 +51,7 @@ impl AsyncIndex {
         } else {
             self.tx.send(Request::ReindexAll).await.unwrap();
         }
-        let response = self.rx.recv().await.unwrap()?;
+        let response = self.rx.lock().await.recv().await.unwrap()?;
         match response {
             Response::Reindex => Ok(()),
             _ => Err(Error::InvalidResponse(response)),
@@ -68,7 +68,7 @@ impl AsyncIndex {
             .await
             .unwrap();
 
-        let response = self.rx.recv().await.unwrap()?;
+        let response = self.rx.lock().await.recv().await.unwrap()?;
         match response {
             Response::Search(results) => Ok(results),
             _ => Err(Error::InvalidResponse(response)),
@@ -142,9 +142,9 @@ impl xapian::MatchSpy for Tagger {
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("xapian is shutting down: {0}")]
-    ChannelRx(#[from] channel::RecvError),
+    ChannelRx(#[from] mpsc::error::TryRecvError),
     #[error("xapian is shutting down: {0}")]
-    ChannelTx(#[from] channel::SendError<Request>),
+    ChannelTx(#[from] SendError<Request>),
     #[error("invalid response: {0:?}")]
     InvalidResponse(Response),
     #[error("i/o error: {0}")]
@@ -156,15 +156,15 @@ pub struct Indexer {
     term_generator: xapian::TermGenerator,
     recipe_dir: PathBuf,
     searcher: Searcher,
-    requests: channel::Receiver<Request>,
-    responses: channel::Sender<Result<Response, Error>>,
+    requests: mpsc::Receiver<Request>,
+    responses: mpsc::Sender<Result<Response, Error>>,
 }
 
 impl Indexer {
     pub fn new(
         recipe_dir: impl AsRef<Path>,
-        requests: channel::Receiver<Request>,
-        responses: channel::Sender<Result<Response, Error>>,
+        requests: mpsc::Receiver<Request>,
+        responses: mpsc::Sender<Result<Response, Error>>,
     ) -> Self {
         let db = xapian::WritableDatabase::inmemory();
         let recipe_dir = PathBuf::from(recipe_dir.as_ref());
@@ -307,9 +307,9 @@ impl Indexer {
     }
 
     pub fn serve(&mut self) {
-        while let Ok(req) = self.requests.recv_blocking() {
+        while let Some(req) = self.requests.blocking_recv() {
             let response = self.handle_request(&req);
-            if self.responses.send_blocking(response).is_err() {
+            if self.responses.blocking_send(response).is_err() {
                 break;
             }
         }

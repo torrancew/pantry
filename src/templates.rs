@@ -1,9 +1,34 @@
 use std::ops::Deref;
 
 use askama::Template;
+use axum::{
+    http::StatusCode,
+    response::{Html, IntoResponse},
+};
 
 const PLACEHOLDER: &str = "—";
 static LAYOUT: Layout = Layout;
+
+pub struct CustomTemplate<T>(T);
+
+impl<T: Template> From<T> for CustomTemplate<T> {
+    fn from(value: T) -> Self {
+        Self(value)
+    }
+}
+
+impl<T: Template> IntoResponse for CustomTemplate<T> {
+    fn into_response(self) -> axum::response::Response {
+        match self.0.render() {
+            Ok(body) => (StatusCode::OK, Html(body)),
+            Err(_) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Html(String::from("something went wrong")),
+            ),
+        }
+        .into_response()
+    }
+}
 
 #[derive(Default, Template)]
 #[template(path = "_layout.html")]

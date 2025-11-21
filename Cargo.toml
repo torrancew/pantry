@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 anyhow = "1"
 askama = "0"
-async-compat = "0.2.4"
 axum = { version = "0.8.7", features = ["macros"] }
 clap = { version = "4", features = ["derive", "env"] }
 comrak = "0"
@@ -22,10 +21,11 @@ search = { git = "https://github.com/torrancew/search-rs", version = "0.1.0" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 slug = "0"
-smol = "2"
-smol-axum = { version = "0", features = ["async-net"] }
-smol-macros = "0"
 thiserror = "2"
+tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1.15"
+
+
 tower-http = { version = "0.6.2", features = ["trace"] }
 tracing = "0"
 tracing-subscriber = { version = "0", features = ["env-filter"]}
