@@ -69,7 +69,7 @@ jobs:
     - name: Push to Registry (arm64)
       if: ${{ matrix.arch == 'arm64' }}
       run: |
-        skopeo copy containers-storage:${{ steps.build_image.outputs.image-with-tag }} ${{ env.IMAGE_REGISTRY }}/${{ steps.build_image.outputs.image-with-tag }}
+        skopeo copy containers-storage:${{ steps.build_image.outputs.image-with-tag }} ${{ steps.build_image.outputs.image-with-tag }}
     - name: Push to Registry (amd64)
       if: ${{ matrix.arch != 'arm64' }}
       uses: redhat-actions/push-to-registry@v2
