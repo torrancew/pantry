@@ -1,5 +1,5 @@
 use std::{
-    io::{self, prelude::Write},
+    fmt::{self, Write},
     sync::{Arc, Mutex},
 };
 
@@ -18,7 +18,7 @@ impl comrak::adapters::HeadingAdapter for HeadingTagger {
         output: &mut dyn Write,
         heading: &comrak::adapters::HeadingMeta,
         _source_pos: Option<comrak::nodes::Sourcepos>,
-    ) -> io::Result<()> {
+    ) -> fmt::Result {
         let id = slug::slugify(&heading.content);
         let mut inner = self.0.lock().unwrap();
 
@@ -41,11 +41,7 @@ impl comrak::adapters::HeadingAdapter for HeadingTagger {
         Ok(())
     }
 
-    fn exit(
-        &self,
-        output: &mut dyn Write,
-        heading: &comrak::adapters::HeadingMeta,
-    ) -> io::Result<()> {
+    fn exit(&self, output: &mut dyn Write, heading: &comrak::adapters::HeadingMeta) -> fmt::Result {
         write!(output, "</h{}>", heading.level)
     }
 }
@@ -61,7 +57,7 @@ impl Default for Parser {
         let mut options = comrak::Options::default();
         let cb = Box::new(Parser::resolve_broken_link);
 
-        options.parse = comrak::ParseOptions::builder()
+        options.parse = comrak::options::Parse::builder()
             .broken_link_callback(Arc::new(cb))
             .build();
 
@@ -74,7 +70,7 @@ impl Default for Parser {
 
 impl Parser {
     pub fn parse(&self, mkd: impl AsRef<str>) -> String {
-        use comrak::{Plugins, RenderPlugins};
+        use comrak::options::{Plugins, RenderPlugins};
 
         let plugins = Plugins::builder()
             .render(
@@ -87,7 +83,9 @@ impl Parser {
         comrak::markdown_to_html_with_plugins(mkd.as_ref(), &self.options, &plugins)
     }
 
-    fn resolve_broken_link(link: comrak::BrokenLinkReference) -> Option<comrak::ResolvedReference> {
+    fn resolve_broken_link(
+        link: comrak::options::BrokenLinkReference,
+    ) -> Option<comrak::ResolvedReference> {
         let url = format!("/recipe/{}", slug::slugify(link.normalized));
         let title = String::from(link.original.trim_start_matches("[").trim_end_matches("]"));
 

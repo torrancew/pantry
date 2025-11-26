@@ -1,9 +1,34 @@
 use std::ops::Deref;
 
-use askama_axum::Template;
+use askama::Template;
+use axum::{
+    http::StatusCode,
+    response::{Html, IntoResponse},
+};
 
 const PLACEHOLDER: &str = "—";
 static LAYOUT: Layout = Layout;
+
+pub struct CustomTemplate<T>(T);
+
+impl<T: Template> From<T> for CustomTemplate<T> {
+    fn from(value: T) -> Self {
+        Self(value)
+    }
+}
+
+impl<T: Template> IntoResponse for CustomTemplate<T> {
+    fn into_response(self) -> axum::response::Response {
+        match self.0.render() {
+            Ok(body) => (StatusCode::OK, Html(body)),
+            Err(_) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Html(String::from("something went wrong")),
+            ),
+        }
+        .into_response()
+    }
+}
 
 #[derive(Default, Template)]
 #[template(path = "_layout.html")]
@@ -32,12 +57,12 @@ impl SearchBar {
 pub struct Recipe<'r> {
     parent: &'r Layout,
     search_bar: SearchBar,
-    recipe: crate::recipe::Recipe,
+    recipe: crate::recipe::MarkdownRecipe,
     title: String,
 }
 
-impl From<crate::recipe::Recipe> for Recipe<'static> {
-    fn from(recipe: crate::recipe::Recipe) -> Self {
+impl From<crate::recipe::MarkdownRecipe> for Recipe<'static> {
+    fn from(recipe: crate::recipe::MarkdownRecipe) -> Self {
         let title = String::from(recipe.metadata().map_or("Unknown", |md| md.title()));
         Self {
             parent: &LAYOUT,

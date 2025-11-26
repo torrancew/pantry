@@ -6,12 +6,10 @@ edition = "2021"
 [dependencies]
 anyhow = "1"
 askama = "0"
-askama_axum = "0"
-async-compat = "0.2.4"
-axum = "0"
+axum = { version = "0.8.7", features = ["macros"] }
 clap = { version = "4", features = ["derive", "env"] }
 comrak = "0"
-dirs = "5"
+dirs = "6"
 macro_rules_attribute = "0"
 mime_guess = "2"
 notify = "6"
@@ -19,16 +17,22 @@ recipe-scraper = "0.1.1"
 reqwest = { version = "0.12.9", features = ["rustls-tls", "rustls-tls-native-roots"], default-features = false }
 rust-embed = { version = "8", features = ["interpolate-folder-path"] }
 scraper = "0"
+search = { git = "https://github.com/torrancew/search-rs", version = "0.1.0" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 slug = "0"
-smol = "2"
-smol-axum = { version = "0", features = ["async-net"] }
-smol-macros = "0"
-thiserror = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1.15"
+
+
+tower-http = { version = "0.6.2", features = ["trace"] }
 tracing = "0"
 tracing-subscriber = { version = "0", features = ["env-filter"]}
 url = { version = "2", features = ["serde"] }
 walkdir = "2"
 xapian-rs = "0.3.0"
 yaml-front-matter = "0"
+
+#[patch.crates-io]
+#smol-axum = { path = "../smol-axum" }

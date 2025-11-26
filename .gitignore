@@ -4,3 +4,5 @@ fly.toml
 /data
 /target
 /vendor/*
+Containerfile.fly
+Procfile.fly

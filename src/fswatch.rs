@@ -1,19 +1,15 @@
 use std::{
     path::{Path, PathBuf},
-    pin::Pin,
     sync::Arc,
 };
 
 use notify::{Result, Watcher};
-use smol::{
-    channel,
-    stream::{Stream, StreamExt},
-};
+use tokio::sync::{mpsc::{channel, Receiver}, Mutex};
 
 #[derive(Clone)]
 pub struct AsyncWatcher {
     _inner: Arc<notify::RecommendedWatcher>,
-    channel: Pin<Box<smol::channel::Receiver<Event>>>,
+    channel: Arc<Mutex<Receiver<notify::Result<Event>>>>,
 }
 
 pub enum Event {
@@ -44,15 +40,11 @@ impl Event {
 
 impl AsyncWatcher {
     pub fn new(path: impl AsRef<Path>) -> Result<Self> {
-        let (tx, rx) = channel::bounded(1);
+        let (tx, rx) = channel(1);
 
         let mut watcher = notify::RecommendedWatcher::new(
-            move |res: Result<notify::Event>| {
-                if let Ok(Some(events)) = res.map(Event::new) {
-                    for ev in events {
-                        tx.send_blocking(ev).unwrap();
-                    }
-                }
+            move |res: notify::Result<notify::Event>| {
+                tx.blocking_send(res.map(|e| Event::new(e).unwrap().into_iter().next().unwrap())).unwrap();
             },
             notify::Config::default(),
         )?;
@@ -61,18 +53,12 @@ impl AsyncWatcher {
 
         Ok(Self {
             _inner: Arc::new(watcher),
-            channel: Box::pin(rx),
+            channel: Arc::new(Mutex::new(rx)),
         })
     }
-}
 
-impl Stream for AsyncWatcher {
-    type Item = Event;
-
-    fn poll_next(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
-        self.channel.poll_next(cx)
+    pub async fn next(&mut self) -> Option<notify::Result<Event>> {
+        self.channel.lock().await.recv().await
     }
 }
+

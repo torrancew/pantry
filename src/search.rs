@@ -6,25 +6,25 @@ use std::{
     thread,
 };
 
-use smol::channel;
+use tokio::sync::mpsc::{self, error::SendError};
 use thiserror::Error;
 use xapian::StemStrategy;
 use xapian_rs as xapian;
 
-use crate::recipe::Recipe;
+use crate::recipe::MarkdownRecipe;
 
 #[derive(Clone)]
 pub struct AsyncIndex {
-    rx: channel::Receiver<Result<Response, Error>>,
-    tx: channel::Sender<Request>,
+    rx: Arc<tokio::sync::Mutex<mpsc::Receiver<Result<Response, Error>>>>,
+    tx: mpsc::Sender<Request>,
     #[allow(dead_code)]
     thread: Arc<thread::JoinHandle<()>>,
 }
 
 impl AsyncIndex {
     pub fn new(recipe_dir: impl AsRef<Path>) -> io::Result<Self> {
-        let (tx, requester) = channel::bounded(1);
-        let (responder, rx) = channel::bounded(1);
+        let (tx, requester) = mpsc::channel(1);
+        let (responder, rx) = mpsc::channel(1);
         let recipe_dir = PathBuf::from(recipe_dir.as_ref());
 
         let thread = Arc::new(
@@ -33,12 +33,12 @@ impl AsyncIndex {
                 .spawn(move || Indexer::new(recipe_dir, requester, responder).serve())?,
         );
 
-        Ok(Self { rx, tx, thread })
+        Ok(Self { rx: Arc::new(tokio::sync::Mutex::new(rx)), tx, thread })
     }
 
     pub async fn remove(&self, paths: Vec<PathBuf>) -> Result<(), Error> {
         self.tx.send(Request::Remove(paths)).await.unwrap();
-        let response = self.rx.recv().await.unwrap()?;
+        let response = self.rx.lock().await.recv().await.unwrap()?;
         match response {
             Response::Reindex => Ok(()),
             _ => Err(Error::InvalidResponse(response)),
@@ -51,7 +51,7 @@ impl AsyncIndex {
         } else {
             self.tx.send(Request::ReindexAll).await.unwrap();
         }
-        let response = self.rx.recv().await.unwrap()?;
+        let response = self.rx.lock().await.recv().await.unwrap()?;
         match response {
             Response::Reindex => Ok(()),
             _ => Err(Error::InvalidResponse(response)),
@@ -68,7 +68,7 @@ impl AsyncIndex {
             .await
             .unwrap();
 
-        let response = self.rx.recv().await.unwrap()?;
+        let response = self.rx.lock().await.recv().await.unwrap()?;
         match response {
             Response::Search(results) => Ok(results),
             _ => Err(Error::InvalidResponse(response)),
@@ -142,9 +142,9 @@ impl xapian::MatchSpy for Tagger {
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("xapian is shutting down: {0}")]
-    ChannelRx(#[from] channel::RecvError),
+    ChannelRx(#[from] mpsc::error::TryRecvError),
     #[error("xapian is shutting down: {0}")]
-    ChannelTx(#[from] channel::SendError<Request>),
+    ChannelTx(#[from] SendError<Request>),
     #[error("invalid response: {0:?}")]
     InvalidResponse(Response),
     #[error("i/o error: {0}")]
@@ -156,15 +156,15 @@ pub struct Indexer {
     term_generator: xapian::TermGenerator,
     recipe_dir: PathBuf,
     searcher: Searcher,
-    requests: channel::Receiver<Request>,
-    responses: channel::Sender<Result<Response, Error>>,
+    requests: mpsc::Receiver<Request>,
+    responses: mpsc::Sender<Result<Response, Error>>,
 }
 
 impl Indexer {
     pub fn new(
         recipe_dir: impl AsRef<Path>,
-        requests: channel::Receiver<Request>,
-        responses: channel::Sender<Result<Response, Error>>,
+        requests: mpsc::Receiver<Request>,
+        responses: mpsc::Sender<Result<Response, Error>>,
     ) -> Self {
         let db = xapian::WritableDatabase::inmemory();
         let recipe_dir = PathBuf::from(recipe_dir.as_ref());
@@ -186,7 +186,7 @@ impl Indexer {
         }
     }
 
-    pub fn index_recipe(&mut self, id: impl AsRef<Path>, recipe: &Recipe) {
+    pub fn index_recipe(&mut self, id: impl AsRef<Path>, recipe: &MarkdownRecipe) {
         let mut doc = xapian::Document::default();
         self.term_generator.set_document(&doc);
         doc.set_data(serde_json::to_string(recipe).unwrap());
@@ -261,7 +261,7 @@ impl Indexer {
         let recipe_dir = self.recipe_dir.clone();
         match req {
             &ReindexAll => {
-                for (path, recipe) in Recipe::load_all(&recipe_dir) {
+                for (path, recipe) in MarkdownRecipe::load_all(&recipe_dir) {
                     self.index_recipe(path, &recipe);
                 }
                 Ok(Response::Reindex)
@@ -269,7 +269,13 @@ impl Indexer {
             ReindexSome(paths) => {
                 for (path, recipe) in paths.iter().filter_map(|p| {
                     fs::File::open(p)
-                        .and_then(Recipe::from_reader)
+                        .and_then(|r| {
+                            let maybe_recipe = MarkdownRecipe::from_reader(r);
+                            if maybe_recipe.is_err() {
+                                tracing::info!("Failed to decode recipe: {maybe_recipe:?}");
+                            }
+                            maybe_recipe
+                        })
                         .map(|r| (p, r))
                         .ok()
                 }) {
@@ -301,9 +307,9 @@ impl Indexer {
     }
 
     pub fn serve(&mut self) {
-        while let Ok(req) = self.requests.recv_blocking() {
+        while let Some(req) = self.requests.blocking_recv() {
             let response = self.handle_request(&req);
-            if self.responses.send_blocking(response).is_err() {
+            if self.responses.blocking_send(response).is_err() {
                 break;
             }
         }
@@ -394,14 +400,14 @@ impl Searcher {
 #[derive(Clone, Debug, Default)]
 pub struct SearchResult {
     categories: BTreeMap<String, usize>,
-    matches: Vec<Recipe>,
+    matches: Vec<MarkdownRecipe>,
     tags: BTreeMap<String, usize>,
 }
 
 impl SearchResult {
     pub fn new(
         categories: impl IntoIterator<Item = (String, usize)>,
-        matches: impl IntoIterator<Item = Recipe>,
+        matches: impl IntoIterator<Item = MarkdownRecipe>,
         tags: impl IntoIterator<Item = (String, usize)>,
     ) -> Self {
         Self {
@@ -415,7 +421,7 @@ impl SearchResult {
         &self.categories
     }
 
-    pub fn matches(&self) -> &Vec<Recipe> {
+    pub fn matches(&self) -> &Vec<MarkdownRecipe> {
         &self.matches
     }
 

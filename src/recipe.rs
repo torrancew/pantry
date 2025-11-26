@@ -110,12 +110,12 @@ impl MetaData {
 }
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
-pub struct Recipe {
+pub struct MarkdownRecipe {
     metadata: Option<MetaData>,
     contents: String,
 }
 
-impl From<SchemaOrgRecipe> for Recipe {
+impl From<SchemaOrgRecipe> for MarkdownRecipe {
     fn from(recipe: SchemaOrgRecipe) -> Self {
         let metadata = MetaData {
             title: recipe.name().clone(),
@@ -198,7 +198,7 @@ impl From<SchemaOrgRecipe> for Recipe {
     }
 }
 
-impl Recipe {
+impl MarkdownRecipe {
     pub fn contents(&self) -> &str {
         &self.contents
     }
@@ -305,7 +305,7 @@ impl Recipe {
     }
 }
 
-impl IntoResponse for Recipe {
+impl IntoResponse for MarkdownRecipe {
     fn into_response(self) -> Response {
         ([(header::CONTENT_TYPE, "text/html")], self.contents).into_response()
     }
