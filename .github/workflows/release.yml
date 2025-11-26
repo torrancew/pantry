@@ -47,7 +47,7 @@ jobs:
     - name: Install OverlayFS
       if: ${{ matrix.arch == 'arm64' }}
       run: |
-        apt-get install -y fuse-overlayfs skopeo
+        sudo apt-get install -y fuse-overlayfs skopeo
     - name: Build Container
       id: build_image
       uses: redhat-actions/buildah-build@v2
