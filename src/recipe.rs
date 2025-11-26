@@ -13,6 +13,7 @@ use axum::{
 };
 use recipe_scraper::SchemaOrgRecipe;
 use serde::{Deserialize, Serialize};
+use tracing::error;
 use url::Url;
 use yaml_front_matter::YamlFrontMatter;
 
@@ -222,9 +223,15 @@ impl MarkdownRecipe {
                     if file_name.starts_with('_') || path.is_dir() {
                         None
                     } else {
-                        std::fs::File::open(path)
+                        match std::fs::File::open(path)
                             .and_then(|f| Self::from_reader(f).map(|r| (PathBuf::from(path), r)))
-                            .ok()
+                        {
+                            Err(e) => {
+                                error!("Failed to index recipe: {e}");
+                                None
+                            }
+                            Ok(item) => Some(item),
+                        }
                     }
                 })
             })
